@@ -1,18 +1,17 @@
 import json
 import uuid
-from collections import defaultdict
 from typing import AsyncGenerator
 
 from loguru import logger
 
 from app.llm_client import chat_completion
 from app.core.prompts import SYSTEM_CHAT
+from app.core.conversation_store import ConversationStore
 
 
 class ChatService:
     def __init__(self):
-        # In-memory conversation store (swap for DB in production)
-        self._conversations: dict[str, list[dict]] = defaultdict(list)
+        self._store = ConversationStore()
 
     async def chat(
         self,
@@ -20,7 +19,7 @@ class ChatService:
         conversation_id: str | None = None,
     ) -> dict:
         conv_id = conversation_id or str(uuid.uuid4())
-        history = self._conversations[conv_id]
+        history = self._store.load(conv_id)
 
         messages = [{"role": "system", "content": SYSTEM_CHAT}]
         messages.extend(history)
@@ -29,9 +28,9 @@ class ChatService:
         response = chat_completion(messages=messages)
         reply = response.choices[0].message.content
 
-        # Save to history
-        history.append({"role": "user", "content": message})
-        history.append({"role": "assistant", "content": reply})
+        # Persist
+        self._store.append(conv_id, {"role": "user", "content": message})
+        self._store.append(conv_id, {"role": "assistant", "content": reply})
 
         logger.info(f"Chat [{conv_id[:8]}]: {message[:50]}...")
         return {"reply": reply, "conversation_id": conv_id}
@@ -42,7 +41,7 @@ class ChatService:
         conversation_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         conv_id = conversation_id or str(uuid.uuid4())
-        history = self._conversations[conv_id]
+        history = self._store.load(conv_id)
 
         messages = [{"role": "system", "content": SYSTEM_CHAT}]
         messages.extend(history)
@@ -56,9 +55,9 @@ class ChatService:
             full_reply += delta
             yield f"data: {json.dumps({'content': delta, 'conversation_id': conv_id})}\n\n"
 
-        # Save to history
-        history.append({"role": "user", "content": message})
-        history.append({"role": "assistant", "content": full_reply})
+        # Persist
+        self._store.append(conv_id, {"role": "user", "content": message})
+        self._store.append(conv_id, {"role": "assistant", "content": full_reply})
 
         yield f"data: {json.dumps({'done': True, 'conversation_id': conv_id})}\n\n"
 
@@ -84,3 +83,12 @@ class ChatService:
             message=enhanced_message,
             conversation_id=conversation_id,
         )
+
+    async def list_conversations(self) -> list[dict]:
+        return self._store.list_conversations()
+
+    async def get_conversation(self, conversation_id: str) -> list[dict]:
+        return self._store.load(conversation_id)
+
+    async def delete_conversation(self, conversation_id: str) -> None:
+        self._store.delete(conversation_id)

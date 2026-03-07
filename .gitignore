@@ -54,3 +54,6 @@ uploads/*
 
 # ChromaDB data
 chroma_data/
+
+# Conversation data
+data/

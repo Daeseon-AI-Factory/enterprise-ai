@@ -1,14 +1,45 @@
 import re
-from loguru import logger
 
+from loguru import logger
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.config import settings
 from app.llm_client import chat_completion
 from app.core.prompts import SYSTEM_TEXT2SQL
 
 
+def _build_db_url() -> str | None:
+    """Build SQLAlchemy connection URL from settings."""
+    if not settings.DB_USER:
+        return None
+
+    if settings.DB_TYPE == "oracle":
+        return (
+            f"oracle+oracledb://{settings.DB_USER}:{settings.DB_PASSWORD}"
+            f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
+        )
+    elif settings.DB_TYPE == "postgresql":
+        return (
+            f"postgresql://{settings.DB_USER}:{settings.DB_PASSWORD}"
+            f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
+        )
+    elif settings.DB_TYPE == "sqlite":
+        return f"sqlite:///{settings.DB_NAME}"
+    return None
+
+
 class Text2SqlService:
     def __init__(self):
-        # In-memory schema store (swap for DB in production)
         self._schemas: dict[str, dict] = {}
+        self._engine = None
+        db_url = _build_db_url()
+        if db_url:
+            try:
+                self._engine = create_engine(db_url, pool_pre_ping=True)
+                logger.info(f"DB engine created: {settings.DB_TYPE}@{settings.DB_HOST}")
+            except Exception as e:
+                logger.warning(f"Failed to create DB engine: {e}")
 
     async def generate(
         self,
@@ -16,13 +47,11 @@ class Text2SqlService:
         schema_id: str | None = None,
     ) -> dict:
         """Generate SQL from natural language question."""
-        # Build schema context
         schema_context = ""
         if schema_id and schema_id in self._schemas:
             schema = self._schemas[schema_id]
             schema_context = self._format_schema(schema)
         elif self._schemas:
-            # Use first available schema if none specified
             first_key = next(iter(self._schemas))
             schema_context = self._format_schema(self._schemas[first_key])
 
@@ -34,14 +63,12 @@ class Text2SqlService:
         response = chat_completion(messages=messages, temperature=0.1)
         content = response.choices[0].message.content
 
-        # Parse SQL and explanation from response
         sql, explanation = self._parse_response(content)
 
-        # Safety check: only SELECT allowed
         if not self._is_safe_sql(sql):
             return {
                 "sql": "",
-                "explanation": "ERROR: Only SELECT queries are allowed. The generated query was blocked.",
+                "explanation": "ERROR: Only SELECT queries are allowed.",
             }
 
         logger.info(f"Text2SQL: {question[:50]}... -> {sql[:50]}...")
@@ -50,17 +77,43 @@ class Text2SqlService:
     async def execute(self, sql: str) -> dict:
         """Execute a confirmed SQL query. SELECT only."""
         if not self._is_safe_sql(sql):
-            return {"error": "Only SELECT queries are allowed", "rows": []}
+            return {"error": "Only SELECT queries are allowed", "rows": [], "columns": []}
 
-        # TODO: Connect to actual database (Oracle/PostgreSQL)
         logger.info(f"Executing SQL: {sql[:100]}...")
-        return {
-            "status": "not_implemented",
-            "message": "Database connection not configured yet. Set DB_* in .env.",
-            "sql": sql,
-            "rows": [],
-            "columns": [],
-        }
+        return self._execute_query(sql)
+
+    def _execute_query(self, sql: str) -> dict:
+        """Execute SQL against the configured database."""
+        if self._engine is None:
+            return {
+                "error": "Database not configured. Set DB_TYPE, DB_HOST, DB_USER, DB_PASSWORD in .env",
+                "sql": sql,
+                "rows": [],
+                "columns": [],
+            }
+
+        try:
+            with self._engine.connect() as conn:
+                result = conn.execute(text(sql))
+                columns = list(result.keys())
+                rows = [dict(zip(columns, row)) for row in result.fetchall()]
+
+                logger.info(f"Query returned {len(rows)} rows, {len(columns)} columns")
+                return {
+                    "sql": sql,
+                    "columns": columns,
+                    "rows": rows,
+                    "row_count": len(rows),
+                }
+        except SQLAlchemyError as e:
+            error_msg = str(e).split("\n")[0]  # First line only
+            logger.error(f"SQL execution error: {error_msg}")
+            return {
+                "error": f"SQL execution error: {error_msg}",
+                "sql": sql,
+                "rows": [],
+                "columns": [],
+            }
 
     async def register_schema(
         self,
@@ -94,7 +147,6 @@ class Text2SqlService:
         return "\n".join(lines)
 
     def _parse_response(self, content: str) -> tuple[str, str]:
-        # Try to extract SQL from markdown code block
         sql_match = re.search(r"```sql\s*(.*?)\s*```", content, re.DOTALL)
         if sql_match:
             sql = sql_match.group(1).strip()

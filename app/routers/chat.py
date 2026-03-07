@@ -50,3 +50,22 @@ async def chat_with_context(req: ChatRequest):
         context=req.context or {},
     )
     return result
+
+
+@router.get("/conversations")
+async def list_conversations():
+    """List all saved conversations."""
+    return await service.list_conversations()
+
+
+@router.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """Get full conversation history."""
+    return await service.get_conversation(conversation_id)
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete a conversation."""
+    await service.delete_conversation(conversation_id)
+    return {"status": "deleted"}
