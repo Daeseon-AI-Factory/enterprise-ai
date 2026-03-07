@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+venv/
+.venv/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Build outputs
+widget/dist/
+platform/dist/
+
+# Offline packages (too large for git)
+offline_packages/
+
+# Models (too large for git)
+models/*
+!models/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# ChromaDB data
+chroma_data/

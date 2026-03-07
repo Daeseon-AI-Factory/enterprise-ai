@@ -1,0 +1,30 @@
+services:
+  backend:
+    build: .
+    env_file: .env
+    ports: ["8080:8080"]
+    volumes:
+      - ./models:/app/models
+      - ./uploads:/app/uploads
+    depends_on:
+      - chromadb
+
+  platform:
+    build: ./platform
+    ports: ["3000:3000"]
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports: ["8100:8000"]
+    volumes:
+      - chroma_data:/chroma/chroma
+
+  n8n:
+    image: n8nio/n8n:latest
+    ports: ["5678:5678"]
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  chroma_data:
+  n8n_data:
