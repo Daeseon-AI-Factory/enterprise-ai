@@ -9,6 +9,7 @@ import {
   Globe,
   Shield,
   Hammer,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ const navItems = [
   { to: "/confluence", icon: Globe, label: "Confluence" },
   { to: "/review", icon: Shield, label: "AI Review" },
   { to: "/build", icon: Hammer, label: "Build" },
+  { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function Sidebar() {

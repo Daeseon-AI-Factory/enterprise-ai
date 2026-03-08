@@ -144,6 +144,14 @@ export const buildApi = {
   detail: (buildId: string) => api.get(`/build/history/${buildId}`),
 };
 
+// Settings (persistent config)
+export const settingsApi = {
+  get: (key: string) => api.get<{ key: string; data: unknown }>(`/settings/${key}`),
+  save: (key: string, data: unknown) => api.put("/settings", { key, data }),
+  delete: (key: string) => api.delete(`/settings/${key}`),
+  list: () => api.get<{ keys: string[] }>("/settings"),
+};
+
 // Health
 export const healthApi = {
   check: () => api.get<{ status: string; mode: string; model: string }>("/health"),

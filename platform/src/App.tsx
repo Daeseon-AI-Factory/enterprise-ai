@@ -8,6 +8,7 @@ import { CodegenPage } from "@/pages/CodegenPage";
 import { ConfluencePage } from "@/pages/ConfluencePage";
 import { ReviewPage } from "@/pages/ReviewPage";
 import { BuildPage } from "@/pages/BuildPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
         <Route path="/confluence" element={<ConfluencePage />} />
         <Route path="/review" element={<ReviewPage />} />
         <Route path="/build" element={<BuildPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   );
