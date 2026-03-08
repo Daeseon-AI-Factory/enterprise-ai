@@ -26,6 +26,9 @@ openai==1.58.1
 # === Monitoring ===
 prometheus-client==0.21.1
 
+# === Confluence ===
+beautifulsoup4==4.12.3
+
 # === Utilities ===
 httpx==0.28.1
 python-dotenv==1.0.1

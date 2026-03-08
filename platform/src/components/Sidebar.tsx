@@ -6,6 +6,7 @@ import {
   Code2,
   LayoutDashboard,
   Bot,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ const navItems = [
   { to: "/rag", icon: FileText, label: "RAG" },
   { to: "/sql", icon: Database, label: "Text-to-SQL" },
   { to: "/codegen", icon: Code2, label: "Code Gen" },
+  { to: "/confluence", icon: Globe, label: "Confluence" },
 ];
 
 export function Sidebar() {

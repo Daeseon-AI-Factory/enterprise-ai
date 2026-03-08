@@ -74,6 +74,29 @@ export const codegenApi = {
   listTemplates: () => api.get("/codegen/templates"),
 };
 
+// Confluence
+export const confluenceApi = {
+  sync: (params: {
+    base_url: string;
+    username: string;
+    api_token: string;
+    space_key: string;
+    collection?: string;
+    labels?: string[];
+    full_sync?: boolean;
+  }) =>
+    api.post<{
+      status: string;
+      space_key: string;
+      collection: string;
+      synced: number;
+      total_chunks: number;
+    }>("/confluence/sync", params),
+
+  listSpaces: (params: { base_url: string; username: string; api_token: string }) =>
+    api.post<Array<{ key: string; name: string; type: string }>>("/confluence/spaces", params),
+};
+
 // Health
 export const healthApi = {
   check: () => api.get<{ status: string; mode: string; model: string }>("/health"),
