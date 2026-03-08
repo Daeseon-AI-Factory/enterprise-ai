@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from app.config import settings
-from app.routers import chat, rag, text2sql, codegen, confluence
+from app.routers import chat, rag, text2sql, codegen, confluence, review, build
 
 app = FastAPI(
     title="Enterprise LLM Platform",
@@ -26,6 +26,8 @@ app.include_router(rag.router, prefix="/api/rag", tags=["RAG"])
 app.include_router(text2sql.router, prefix="/api/text2sql", tags=["Text2SQL"])
 app.include_router(codegen.router, prefix="/api/codegen", tags=["Codegen"])
 app.include_router(confluence.router, prefix="/api/confluence", tags=["Confluence"])
+app.include_router(review.router, prefix="/api/review", tags=["Review"])
+app.include_router(build.router, prefix="/api/build", tags=["Build"])
 
 
 @app.get("/health")

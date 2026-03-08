@@ -6,6 +6,8 @@ import { RagPage } from "@/pages/RagPage";
 import { SqlPage } from "@/pages/SqlPage";
 import { CodegenPage } from "@/pages/CodegenPage";
 import { ConfluencePage } from "@/pages/ConfluencePage";
+import { ReviewPage } from "@/pages/ReviewPage";
+import { BuildPage } from "@/pages/BuildPage";
 
 export function App() {
   return (
@@ -17,6 +19,8 @@ export function App() {
         <Route path="/sql" element={<SqlPage />} />
         <Route path="/codegen" element={<CodegenPage />} />
         <Route path="/confluence" element={<ConfluencePage />} />
+        <Route path="/review" element={<ReviewPage />} />
+        <Route path="/build" element={<BuildPage />} />
       </Route>
     </Routes>
   );

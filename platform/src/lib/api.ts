@@ -97,6 +97,53 @@ export const confluenceApi = {
     api.post<Array<{ key: string; name: string; type: string }>>("/confluence/spaces", params),
 };
 
+// Review (Code Review + Edge Case)
+export const reviewApi = {
+  codeReview: (code: string, language?: string, context?: string) =>
+    api.post<{ review: string; language: string }>("/review/code", {
+      code,
+      language,
+      context,
+    }),
+
+  edgeCases: (code: string, language?: string, context?: string) =>
+    api.post<{ analysis: string; language: string }>("/review/edge-cases", {
+      code,
+      language,
+      context,
+    }),
+};
+
+// Build & Deploy
+export const buildApi = {
+  run: (projectPath: string, command: string = "npm run build", name?: string) =>
+    api.post("/build/run", {
+      project_path: projectPath,
+      command,
+      name,
+    }),
+
+  deploy: (projectPath: string, command: string, name?: string) =>
+    api.post("/build/deploy", {
+      project_path: projectPath,
+      command,
+      name,
+    }),
+
+  history: (limit: number = 20) =>
+    api.get<Array<{
+      build_id: string;
+      name: string;
+      status: string;
+      command: string;
+      started_at: string;
+      finished_at: string;
+      return_code: number;
+    }>>(`/build/history?limit=${limit}`),
+
+  detail: (buildId: string) => api.get(`/build/history/${buildId}`),
+};
+
 // Health
 export const healthApi = {
   check: () => api.get<{ status: string; mode: string; model: string }>("/health"),
