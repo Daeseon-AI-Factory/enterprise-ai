@@ -25,6 +25,7 @@ openai==1.58.1
 
 # === Database (Text-to-SQL) ===
 sqlalchemy==2.0.36
+oracledb>=2.0.0
 
 # === Monitoring ===
 prometheus-client==0.21.1
