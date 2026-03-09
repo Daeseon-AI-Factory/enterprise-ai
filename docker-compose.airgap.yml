@@ -6,12 +6,15 @@ services:
     volumes:
       - ./models:/app/models
       - ./uploads:/app/uploads
+      - ./data:/app/data
     depends_on:
       - chromadb
 
   platform:
     build: ./platform
     ports: ["3000:3000"]
+    depends_on:
+      - backend
 
   chromadb:
     image: chromadb/chroma:latest

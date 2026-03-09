@@ -67,6 +67,10 @@ def _():
 def _():
     import openpyxl  # noqa: F401
 
+@check("BeautifulSoup4")
+def _():
+    import bs4  # noqa: F401
+
 @check("Loguru")
 def _():
     import loguru  # noqa: F401
@@ -95,6 +99,28 @@ def _():
             f"Embedding model not found at {model_path}. "
             "Download it or set EMBEDDING_MODEL_PATH in .env"
         )
+
+
+# === Data Directories Check ===
+
+@check("Data directories writable")
+def _():
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for subdir in ["data/conversations", "data/builds", "data/settings", "data/confluence", "uploads"]:
+        path = os.path.join(base, subdir)
+        os.makedirs(path, exist_ok=True)
+        assert os.path.isdir(path), f"Cannot create {path}"
+
+
+# === App Module Import Check ===
+
+@check("Backend modules import")
+def _():
+    from app.main import app  # noqa: F401
+    from app.services.review_service import ReviewService  # noqa: F401
+    from app.services.build_service import BuildService  # noqa: F401
+    from app.services.settings_service import SettingsService  # noqa: F401
+    from app.connectors.confluence import ConfluenceConnector  # noqa: F401
 
 
 # === LLM Endpoint Check ===

@@ -104,18 +104,28 @@ cd "$PROJECT_DIR"
 # ----------------------------------------------------------
 # Step 7: Docker images
 # ----------------------------------------------------------
-echo "[7/8] Loading Docker images..."
+echo "[7/9] Loading Docker images..."
 if command -v docker &>/dev/null; then
-  [ -f "$PKG/docker/chromadb.tar" ] && docker load -i "$PKG/docker/chromadb.tar"
-  [ -f "$PKG/docker/n8n.tar" ] && docker load -i "$PKG/docker/n8n.tar"
+  for img in chromadb n8n python311 node20 nginx; do
+    if [ -f "$PKG/docker/${img}.tar" ]; then
+      echo "  Loading ${img}..."
+      docker load -i "$PKG/docker/${img}.tar"
+    fi
+  done
 else
   echo "Docker not available. Skipping image load."
 fi
 
 # ----------------------------------------------------------
+# Step 8: Create data directories
+# ----------------------------------------------------------
+echo "[8/9] Creating data directories..."
+mkdir -p "$PROJECT_DIR"/{data/conversations,data/builds,data/settings,data/confluence,uploads}
+
+# ----------------------------------------------------------
 # Step 8: Environment setup
 # ----------------------------------------------------------
-echo "[8/8] Setting up environment..."
+echo "[9/9] Setting up environment..."
 if [ ! -f "$PROJECT_DIR/.env" ]; then
   cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
   echo "Created .env from .env.example — EDIT THIS FILE:"
