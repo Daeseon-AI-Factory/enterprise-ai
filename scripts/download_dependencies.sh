@@ -20,7 +20,7 @@ mkdir -p "$OUT"/{python,node,docker,models}
 # Step 1: Python wheels
 # ----------------------------------------------------------
 echo ""
-echo "[1/6] Downloading Python wheels..."
+echo "[1/7] Downloading Python wheels..."
 pip download \
   -r "$PROJECT_DIR/requirements.txt" \
   -d "$OUT/python/" \
@@ -36,7 +36,7 @@ echo "Python wheels: $(du -sh "$OUT/python/" | cut -f1)"
 # Step 2: Embedding model
 # ----------------------------------------------------------
 echo ""
-echo "[2/6] Downloading embedding model (bge-large-en-v1.5)..."
+echo "[2/7] Downloading embedding model (bge-large-en-v1.5)..."
 if command -v huggingface-cli &>/dev/null; then
   huggingface-cli download BAAI/bge-large-en-v1.5 \
     --local-dir "$OUT/models/embedding"
@@ -49,7 +49,7 @@ fi
 # Step 3: Node.js 20.x LTS installers
 # ----------------------------------------------------------
 echo ""
-echo "[3/6] Downloading Node.js 20.x LTS installers..."
+echo "[3/7] Downloading Node.js 20.x LTS installers..."
 NODE_VERSION="v20.18.1"
 wget -q --show-progress -P "$OUT/node/" \
   "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz" || true
@@ -60,7 +60,7 @@ wget -q --show-progress -P "$OUT/node/" \
 # Step 4: npm packages (widget + platform)
 # ----------------------------------------------------------
 echo ""
-echo "[4/6] Downloading npm packages..."
+echo "[4/7] Downloading npm packages..."
 
 # Widget
 cd "$PROJECT_DIR/widget"
