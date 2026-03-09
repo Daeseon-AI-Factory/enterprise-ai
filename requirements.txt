@@ -23,6 +23,9 @@ tiktoken==0.8.0
 # === LLM Client (OpenAI-compatible API) ===
 openai==1.58.1
 
+# === Database (Text-to-SQL) ===
+sqlalchemy==2.0.36
+
 # === Monitoring ===
 prometheus-client==0.21.1
 

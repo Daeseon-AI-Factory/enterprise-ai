@@ -71,6 +71,10 @@ def _():
 def _():
     import bs4  # noqa: F401
 
+@check("SQLAlchemy")
+def _():
+    import sqlalchemy  # noqa: F401
+
 @check("Loguru")
 def _():
     import loguru  # noqa: F401

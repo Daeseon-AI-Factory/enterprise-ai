@@ -24,7 +24,7 @@ fi
 # Step 1: Node.js (if not installed)
 # ----------------------------------------------------------
 if ! command -v node &>/dev/null; then
-  echo "[1/8] Installing Node.js..."
+  echo "[1/9] Installing Node.js..."
   if [ -f "$PKG/node/node-"*"-linux-x64.tar.xz" ]; then
     tar -xf "$PKG"/node/node-*-linux-x64.tar.xz -C /usr/local --strip-components=1
     echo "Node.js $(node --version) installed"
@@ -32,14 +32,14 @@ if ! command -v node &>/dev/null; then
     echo "WARNING: Node.js installer not found in offline_packages/node/"
   fi
 else
-  echo "[1/8] Node.js already installed: $(node --version)"
+  echo "[1/9] Node.js already installed: $(node --version)"
 fi
 
 # ----------------------------------------------------------
 # Step 2: Docker (if not installed)
 # ----------------------------------------------------------
 if ! command -v docker &>/dev/null; then
-  echo "[2/8] Installing Docker..."
+  echo "[2/9] Installing Docker..."
   if [ -f "$PKG/docker/docker-"*".tgz" ]; then
     tar -xzf "$PKG"/docker/docker-*.tgz
     cp docker/* /usr/bin/
@@ -49,13 +49,13 @@ if ! command -v docker &>/dev/null; then
     echo "WARNING: Docker installer not found in offline_packages/docker/"
   fi
 else
-  echo "[2/8] Docker already installed: $(docker --version)"
+  echo "[2/9] Docker already installed: $(docker --version)"
 fi
 
 # ----------------------------------------------------------
 # Step 3: Python venv (isolate from model serving env)
 # ----------------------------------------------------------
-echo "[3/8] Creating Python virtual environment..."
+echo "[3/9] Creating Python virtual environment..."
 mkdir -p "$INSTALL_DIR"
 python3 -m venv "$INSTALL_DIR/venv"
 source "$INSTALL_DIR/venv/bin/activate"
@@ -63,13 +63,13 @@ source "$INSTALL_DIR/venv/bin/activate"
 # ----------------------------------------------------------
 # Step 4: Python packages
 # ----------------------------------------------------------
-echo "[4/8] Installing Python packages (offline)..."
+echo "[4/9] Installing Python packages (offline)..."
 pip install --no-index --find-links="$PKG/python/" -r "$PROJECT_DIR/requirements.txt"
 
 # ----------------------------------------------------------
 # Step 5: Embedding model
 # ----------------------------------------------------------
-echo "[5/8] Copying embedding model..."
+echo "[5/9] Copying embedding model..."
 if [ -d "$PKG/models/embedding" ]; then
   mkdir -p "$PROJECT_DIR/models"
   cp -r "$PKG/models/embedding" "$PROJECT_DIR/models/"
@@ -81,7 +81,7 @@ fi
 # ----------------------------------------------------------
 # Step 6: Frontend builds
 # ----------------------------------------------------------
-echo "[6/8] Building frontends..."
+echo "[6/9] Building frontends..."
 
 # Widget
 cd "$PROJECT_DIR/widget"
@@ -123,7 +123,7 @@ echo "[8/9] Creating data directories..."
 mkdir -p "$PROJECT_DIR"/{data/conversations,data/builds,data/settings,data/confluence,uploads}
 
 # ----------------------------------------------------------
-# Step 8: Environment setup
+# Step 9: Environment setup
 # ----------------------------------------------------------
 echo "[9/9] Setting up environment..."
 if [ ! -f "$PROJECT_DIR/.env" ]; then
