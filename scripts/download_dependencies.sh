@@ -36,13 +36,13 @@ echo "Python wheels: $(du -sh "$OUT/python/" | cut -f1)"
 # Step 2: Embedding model
 # ----------------------------------------------------------
 echo ""
-echo "[2/7] Downloading embedding model (bge-large-en-v1.5)..."
+echo "[2/7] Downloading embedding model (bge-m3)..."
 if command -v huggingface-cli &>/dev/null; then
-  huggingface-cli download BAAI/bge-large-en-v1.5 \
+  huggingface-cli download BAAI/bge-m3 \
     --local-dir "$OUT/models/embedding"
 else
   echo "huggingface-cli not found. Install: pip install huggingface_hub"
-  echo "Then run: huggingface-cli download BAAI/bge-large-en-v1.5 --local-dir $OUT/models/embedding"
+  echo "Then run: huggingface-cli download BAAI/bge-m3 --local-dir $OUT/models/embedding"
 fi
 
 # ----------------------------------------------------------

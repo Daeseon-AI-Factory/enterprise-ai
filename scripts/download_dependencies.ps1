@@ -48,16 +48,16 @@ Write-Host "Python wheels: $([math]::Round($pySize)) MB"
 # Step 2: Embedding model
 # ----------------------------------------------------------
 Write-Host ""
-Write-Host "[2/7] Downloading embedding model (bge-large-en-v1.5)..." -ForegroundColor Yellow
+Write-Host "[2/7] Downloading embedding model (bge-m3)..." -ForegroundColor Yellow
 
 $modelDir = Join-Path $Out "models\embedding"
 
 if (Get-Command huggingface-cli -ErrorAction SilentlyContinue) {
-    & huggingface-cli download BAAI/bge-large-en-v1.5 --local-dir $modelDir
+    & huggingface-cli download BAAI/bge-m3 --local-dir $modelDir
 } else {
     Write-Host "huggingface-cli not found." -ForegroundColor DarkYellow
     Write-Host "Install: pip install huggingface_hub"
-    Write-Host "Then run: huggingface-cli download BAAI/bge-large-en-v1.5 --local-dir $modelDir"
+    Write-Host "Then run: huggingface-cli download BAAI/bge-m3 --local-dir $modelDir"
 }
 
 # ----------------------------------------------------------

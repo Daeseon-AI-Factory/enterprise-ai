@@ -32,6 +32,9 @@ platform/dist/
 
 # Offline packages (too large for git)
 offline_packages/
+_offline_build/
+enterprise-llm-offline-*.tar.gz
+enterprise-llm-offline-*.zip
 
 # Models (too large for git)
 models/*
