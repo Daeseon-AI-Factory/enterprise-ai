@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     DB_USER: str = ""
     DB_PASSWORD: str = ""
 
+    # Function Calling
+    FUNCTION_CALLING_MODE: str = "auto"  # "native", "prompt", "auto"
+
+    # Webhook
+    WEBHOOK_SECRET: str = ""
+    N8N_BASE_URL: str = "http://n8n:5678"
+
+    # Multi-Modal
+    WHISPER_MODEL_PATH: str = "./models/whisper"
+    VISION_MODEL: str = ""  # empty = disabled
+    OCR_ENGINE: str = "paddleocr"  # "paddleocr" or "tesseract"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
