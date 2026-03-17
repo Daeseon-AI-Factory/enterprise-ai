@@ -152,9 +152,10 @@ export const settingsApi = {
   list: () => api.get<{ keys: string[] }>("/settings"),
 };
 
-// Health
+// Health — endpoint is at root /health, not under /api
 export const healthApi = {
-  check: () => api.get<{ status: string; mode: string; model: string }>("/health"),
+  check: () =>
+    axios.get<{ status: string; mode: string; model: string }>("/health"),
 };
 
 export default api;

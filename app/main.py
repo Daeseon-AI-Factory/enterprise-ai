@@ -1,8 +1,27 @@
+import sys
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.config import settings
+
+# === Logging Setup ===
+LOG_DIR = Path("logs")
+LOG_DIR.mkdir(exist_ok=True)
+
+# Remove default stderr handler, re-add with format
+logger.remove()
+logger.add(sys.stderr, level="INFO", format="{time:HH:mm:ss} | {level:<7} | {name}:{function}:{line} | {message}")
+logger.add(
+    LOG_DIR / "server_{time:YYYY-MM-DD}.log",
+    rotation="00:00",
+    retention="30 days",
+    level="DEBUG",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level:<7} | {name}:{function}:{line} | {message}",
+    encoding="utf-8",
+)
 from app.routers import (
     chat, rag, text2sql, codegen, confluence, review, build,
     settings as settings_router,

@@ -62,16 +62,24 @@ class FunctionChatService:
         conv_id = conversation_id or str(uuid.uuid4())
         history = self._store.load(conv_id)
 
-        if settings.FUNCTION_CALLING_MODE == "native":
-            result = await self._chat_native(message, history, enabled_tools)
-        elif settings.FUNCTION_CALLING_MODE == "prompt":
-            result = await self._chat_prompt(message, history, enabled_tools)
-        else:  # auto
-            try:
+        try:
+            if settings.FUNCTION_CALLING_MODE == "native":
                 result = await self._chat_native(message, history, enabled_tools)
-            except Exception:
-                logger.info("Native function calling failed, falling back to prompt mode")
+            elif settings.FUNCTION_CALLING_MODE == "prompt":
                 result = await self._chat_prompt(message, history, enabled_tools)
+            else:  # auto
+                try:
+                    result = await self._chat_native(message, history, enabled_tools)
+                except Exception:
+                    logger.info("Native function calling failed, falling back to prompt mode")
+                    result = await self._chat_prompt(message, history, enabled_tools)
+        except Exception as e:
+            logger.error(f"Smart chat LLM call failed: {e}")
+            return {
+                "reply": f"LLM 호출 실패: {e}",
+                "conversation_id": conv_id,
+                "tools_used": [],
+            }
 
         # Persist conversation
         self._store.append(conv_id, {"role": "user", "content": message})

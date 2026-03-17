@@ -83,8 +83,12 @@ class RagService:
             {"role": "system", "content": SYSTEM_RAG},
             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"},
         ]
-        response = chat_completion(messages=messages)
-        answer = response.choices[0].message.content
+        try:
+            response = chat_completion(messages=messages)
+            answer = response.choices[0].message.content or ""
+        except Exception as e:
+            logger.error(f"RAG LLM call failed: {e}")
+            answer = f"LLM 호출 실패: {e}"
 
         return {"answer": answer, "sources": sources}
 

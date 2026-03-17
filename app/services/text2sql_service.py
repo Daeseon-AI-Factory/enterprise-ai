@@ -60,8 +60,12 @@ class Text2SqlService:
             {"role": "user", "content": f"Schema:\n{schema_context}\n\nQuestion: {question}"},
         ]
 
-        response = chat_completion(messages=messages, temperature=0.1)
-        content = response.choices[0].message.content
+        try:
+            response = chat_completion(messages=messages, temperature=0.1)
+            content = response.choices[0].message.content or ""
+        except Exception as e:
+            logger.error(f"Text2SQL LLM call failed: {e}")
+            return {"sql": "", "explanation": f"LLM 호출 실패: {e}"}
 
         sql, explanation = self._parse_response(content)
 
