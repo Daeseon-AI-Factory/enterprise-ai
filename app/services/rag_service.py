@@ -54,24 +54,40 @@ class RagService:
     async def query(
         self,
         query: str,
-        collection: str = "default",
+        collection: str = "all",
         top_k: int = 5,
     ) -> dict:
-        """Query documents using RAG pipeline."""
-        # Retrieve relevant chunks
-        results = self._vector_store.search(
-            collection=collection,
-            query=query,
-            top_k=top_k,
-        )
+        """Query documents using RAG pipeline. collection='all' searches every collection."""
+        # Search all collections or a specific one
+        if collection in ("all", "", "*"):
+            all_results = []
+            for col in self._vector_store.list_collections():
+                col_name = col["name"]
+                try:
+                    hits = self._vector_store.search(collection=col_name, query=query, top_k=top_k)
+                    for h in hits:
+                        h["collection"] = col_name
+                    all_results.extend(hits)
+                except Exception as e:
+                    logger.warning(f"Search failed in '{col_name}': {e}")
+            all_results.sort(key=lambda x: x.get("score", 999))
+            results = all_results[:top_k]
+            logger.info(f"RAG query (all collections): '{query[:50]}' → {len(results)} chunks")
+        else:
+            results = self._vector_store.search(collection=collection, query=query, top_k=top_k)
+            for r in results:
+                r["collection"] = collection
+            logger.info(f"RAG query ('{collection}'): '{query[:50]}' → {len(results)} chunks")
 
         # Build context from retrieved docs
         context_parts = []
         sources = []
         for doc in results:
-            context_parts.append(doc["content"])
+            col_label = doc.get("collection", "")
+            context_parts.append(f"[{col_label}/{doc.get('filename','?')}]\n{doc['content']}")
             sources.append({
                 "filename": doc.get("filename", "unknown"),
+                "collection": col_label,
                 "chunk_id": doc.get("id", ""),
                 "score": doc.get("score", 0),
             })

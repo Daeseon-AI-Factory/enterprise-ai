@@ -9,7 +9,7 @@ service = RagService()
 
 class RagQueryRequest(BaseModel):
     query: str
-    collection: str = "default"
+    collection: str = "all"
     top_k: int = 5
 
 

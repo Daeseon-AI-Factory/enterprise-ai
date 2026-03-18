@@ -31,7 +31,7 @@ export function RagPage() {
   const [loading, setLoading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [activeCollection, setActiveCollection] = useState("default");
+  const [activeCollection, setActiveCollection] = useState("all");
   const [expandedCol, setExpandedCol] = useState<string | null>(null);
   const [colDocs, setColDocs] = useState<Record<string, DocFile[]>>({});
   const [loadingDocs, setLoadingDocs] = useState<string | null>(null);
@@ -129,9 +129,10 @@ export function RagPage() {
                 <Input
                   value={activeCollection}
                   onChange={(e) => setActiveCollection(e.target.value)}
-                  placeholder="default"
-                  className="max-w-[180px]"
+                  placeholder="all (전체 검색)"
+                  className="max-w-[200px]"
                 />
+                <span className="text-xs text-muted-foreground">all = 전체, 또는 컬렉션명 지정</span>
               </div>
               <div className="flex gap-2">
                 <Input
