@@ -297,6 +297,23 @@ export function RagPage() {
                                   >
                                     <Eye className="h-3 w-3" />
                                   </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive"
+                                    title="문서 삭제"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!confirm(`'${doc.filename}' 문서를 삭제하시겠습니까?`)) return;
+                                      await ragApi.deleteDocument(c.name, doc.doc_id);
+                                      setColDocs(prev => ({
+                                        ...prev,
+                                        [c.name]: (prev[c.name] ?? []).filter(d => d.doc_id !== doc.doc_id),
+                                      }));
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
                                 </div>
                               ))}
                             </div>

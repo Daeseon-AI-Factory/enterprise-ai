@@ -5,14 +5,14 @@ from fastapi import UploadFile
 from loguru import logger
 
 from app.llm_client import chat_completion
-from app.core.vector_store import VectorStore
+from app.core.vector_store import get_vector_store
 from app.core.document_loader import DocumentLoader
 from app.core.prompts import SYSTEM_RAG
 
 
 class RagService:
     def __init__(self):
-        self._vector_store = VectorStore()
+        self._vector_store = get_vector_store()
         self._doc_loader = DocumentLoader()
 
     async def upload_and_index(
@@ -124,6 +124,11 @@ class RagService:
 
     async def get_document_chunks(self, collection: str, doc_id: str) -> list[dict]:
         return self._vector_store.get_document_chunks(collection, doc_id)
+
+    async def delete_document(self, collection: str, doc_id: str) -> dict:
+        removed = self._vector_store.delete_document(collection, doc_id)
+        logger.info(f"Deleted document {doc_id} from {collection}: {removed} chunks")
+        return {"status": "deleted", "doc_id": doc_id, "chunks_removed": removed}
 
     async def delete_collection(self, collection_id: str) -> None:
         self._vector_store.delete_collection(collection_id)

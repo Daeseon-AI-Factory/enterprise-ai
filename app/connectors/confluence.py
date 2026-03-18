@@ -11,6 +11,8 @@ import httpx
 from bs4 import BeautifulSoup
 from loguru import logger
 
+from app.config import settings
+
 
 # Persisted sync state so we only re-index pages that changed.
 _SYNC_STATE_DIR = "./data/confluence"
@@ -50,6 +52,7 @@ class ConfluenceConnector:
                 params=params,
                 auth=self.auth,
                 timeout=30,
+                verify=settings.CONFLUENCE_VERIFY_SSL,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -95,6 +98,7 @@ class ConfluenceConnector:
             params={"expand": "body.storage,version"},
             auth=self.auth,
             timeout=30,
+            verify=settings.CONFLUENCE_VERIFY_SSL,
         )
         if resp.status_code == 404:
             return None

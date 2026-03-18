@@ -300,6 +300,50 @@ class VectorStore:
         chunks.sort(key=lambda x: x["chunk_index"])
         return chunks
 
+    def delete_document(self, collection: str, doc_id: str) -> int:
+        """Delete all chunks for a specific document from ChromaDB and BM25."""
+        try:
+            col = self.client.get_collection(name=collection)
+            result = col.get(where={"doc_id": doc_id})
+            ids = result.get("ids", [])
+            if ids:
+                col.delete(ids=ids)
+            # Rebuild BM25 after deletion
+            self.rebuild_bm25(collection)
+            logger.info(f"Deleted doc '{doc_id}' from '{collection}': {len(ids)} chunks removed")
+            return len(ids)
+        except Exception as e:
+            logger.warning(f"delete_document failed: {e}")
+            return 0
+
+    def rebuild_bm25(self, collection: str) -> None:
+        """Rebuild BM25 index from current ChromaDB data (used after incremental sync)."""
+        try:
+            col = self.client.get_collection(name=collection)
+            result = col.get(include=["documents", "metadatas"])
+            docs = result.get("documents") or []
+            if not docs:
+                return
+            self._bm25.delete_collection(collection)
+            self._bm25.add_documents(
+                collection=collection,
+                docs=docs,
+                ids=result.get("ids", [f"doc_{i}" for i in range(len(docs))]),
+                metadatas=result.get("metadatas", [{} for _ in docs]),
+            )
+            logger.info(f"BM25 rebuilt for '{collection}': {len(docs)} docs")
+        except Exception as e:
+            logger.warning(f"BM25 rebuild failed for '{collection}': {e}")
+
     def delete_collection(self, collection_id: str) -> None:
         self.client.delete_collection(name=collection_id)
         self._bm25.delete_collection(collection_id)
+
+# 전역 싱글톤 — 모든 모듈이 이걸 import해서 사용
+_instance: VectorStore | None = None
+
+def get_vector_store() -> VectorStore:
+    global _instance
+    if _instance is None:
+        _instance = VectorStore()
+    return _instance

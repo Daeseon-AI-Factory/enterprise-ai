@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from loguru import logger
 
 from app.llm_client import chat_completion
-from app.core.vector_store import VectorStore
+from app.core.vector_store import get_vector_store
 from app.core.training_data_store import TrainingDataStore
 
 
@@ -40,7 +40,7 @@ Text chunk:
 
 class FinetuneService:
     def __init__(self):
-        self._vector_store = VectorStore()
+        self._vector_store = get_vector_store()
         self._data_store = TrainingDataStore()
 
     async def generate_qa_pairs(

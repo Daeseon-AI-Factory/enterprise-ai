@@ -5,6 +5,32 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// Attach JWT token to every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("auth_token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// Redirect to login on 401
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
+
+// Auth API
+export const authApi = {
+  login: (username: string, password: string) =>
+    api.post<{ access_token: string; username: string }>("/auth/login", { username, password }),
+};
+
 // Chat
 export const chatApi = {
   send: (message: string, conversationId?: string) =>
@@ -19,6 +45,17 @@ export const chatApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, conversation_id: conversationId }),
     }),
+
+  listConversations: () =>
+    api.get<Array<{ id: string; preview: string; message_count: number; modified: number }>>(
+      "/chat/conversations"
+    ),
+
+  getConversation: (id: string) =>
+    api.get<Array<{ role: string; content: string }>>(`/chat/conversations/${id}`),
+
+  deleteConversation: (id: string) =>
+    api.delete(`/chat/conversations/${id}`),
 };
 
 // RAG
@@ -51,6 +88,9 @@ export const ragApi = {
       `/rag/collections/${collection}/documents/${docId}/chunks`
     ),
 
+  deleteDocument: (collection: string, docId: string) =>
+    api.delete(`/rag/collections/${collection}/documents/${docId}`),
+
   deleteCollection: (id: string) => api.delete(`/rag/collections/${id}`),
 };
 
@@ -68,7 +108,17 @@ export const sqlApi = {
   registerSchema: (schemaId: string, tables: unknown[], description?: string) =>
     api.post("/text2sql/schema", { schema_id: schemaId, tables, description }),
 
-  listSchemas: () => api.get("/text2sql/schemas"),
+  listSchemas: () =>
+    api.get<Array<{ schema_id: string; table_count: number; description?: string }>>("/text2sql/schemas"),
+
+  deleteSchema: (schemaId: string) =>
+    api.delete(`/text2sql/schemas/${schemaId}`),
+
+  testConnection: (params: { db_type: string; host: string; port: number; database: string; username: string; password: string; oracle_service?: string }) =>
+    api.post<{ status: string; message: string; tables_found?: number }>("/text2sql/connection/test", params),
+
+  discoverSchema: (params: { schema_id: string; db_type: string; host: string; port: number; database: string; username: string; password: string; owner?: string; description?: string }) =>
+    api.post<{ schema_id: string; table_count: number; tables: unknown[] }>("/text2sql/schema/discover", params),
 };
 
 // Codegen
@@ -166,6 +216,34 @@ export const settingsApi = {
 export const healthApi = {
   check: () =>
     axios.get<{ status: string; mode: string; model: string }>("/health"),
+};
+
+// Analyze (RAG + DB combined)
+export const analyzeApi = {
+  query: (params: {
+    question: string;
+    schema_id?: string;
+    collections?: string[];
+    run_sql?: boolean;
+  }) => api.post<{
+    answer: string;
+    rag_sources: Array<{ collection: string; filename: string; score: number }>;
+    db_sql: string;
+    db_rows: Record<string, unknown>[];
+    db_row_count: number;
+  }>("/analyze", params),
+};
+
+// Git RAG
+export const gitApi = {
+  indexRepo: (params: { repo_path: string; repo_url?: string; collection?: string }) =>
+    api.post<{ job_id: string; status: string }>("/git/index", params),
+  indexStatus: (jobId: string) =>
+    api.get<{ job_id: string; status: string; files_indexed: number; chunks_indexed: number; message: string }>(
+      `/git/index/${jobId}`
+    ),
+  listCollections: () =>
+    api.get<Array<{ name: string; count: number }>>("/git/collections"),
 };
 
 export default api;

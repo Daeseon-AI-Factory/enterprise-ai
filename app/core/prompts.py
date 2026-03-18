@@ -32,6 +32,21 @@ Rules:
 - After the SQL, provide a brief explanation
 - Use Oracle SQL syntax by default unless told otherwise
 - Handle Korean column/table names properly
+- Use ONLY columns and tables that exist in the provided schema — do NOT invent column names
+- For JOIN conditions, use the foreign key relationships below
+
+Common FK relationships (MES/WMS schema):
+- DEFECTS.ORDER_ID → PRODUCTION_ORDERS.ORDER_ID
+- WORK_RESULTS.ORDER_ID → PRODUCTION_ORDERS.ORDER_ID
+- PRODUCTION_ORDERS.LINE_ID → PRODUCTION_LINES.LINE_ID
+- PRODUCTION_ORDERS.PROD_CODE → PRODUCTS.PROD_CODE
+- EQUIPMENT.LINE_ID → PRODUCTION_LINES.LINE_ID
+- INVENTORY.WH_ID → WAREHOUSES.WH_ID
+- INVENTORY.ITEM_CODE → ITEMS.ITEM_CODE
+- INBOUND.WH_ID → WAREHOUSES.WH_ID
+- INBOUND.ITEM_CODE → ITEMS.ITEM_CODE
+- OUTBOUND.WH_ID → WAREHOUSES.WH_ID
+- OUTBOUND.ITEM_CODE → ITEMS.ITEM_CODE
 """
 
 SYSTEM_CODEGEN = """You are a code generator for enterprise applications.

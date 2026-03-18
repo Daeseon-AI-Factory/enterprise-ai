@@ -14,14 +14,14 @@ from loguru import logger
 
 from app.config import settings
 from app.core.document_loader import DocumentLoader
-from app.core.vector_store import VectorStore
+from app.core.vector_store import get_vector_store
 
 _UPLOAD_DIR = Path("./uploads/ocr")
 
 
 class OcrService:
     def __init__(self):
-        self._vector_store = VectorStore()
+        self._vector_store = get_vector_store()
         self._doc_loader = DocumentLoader()
         self._ocr_engine = None
         _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

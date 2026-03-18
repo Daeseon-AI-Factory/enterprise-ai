@@ -23,6 +23,7 @@ logger.add(
     encoding="utf-8",
 )
 from app.routers import (
+    auth, analyze, git_rag,
     chat, rag, text2sql, codegen, confluence, review, build,
     settings as settings_router,
     agent, function_chat, finetune, webhook, scheduler, ocr, stt, vision,
@@ -41,6 +42,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# === Auth ===
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+
+# === Unified Analysis (RAG + DB) ===
+app.include_router(analyze.router, prefix="/api", tags=["Analyze"])
+
+# === Git Source RAG ===
+app.include_router(git_rag.router, prefix="/api/git", tags=["Git RAG"])
 
 # === Level 1-5: Core Features ===
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
@@ -88,11 +98,59 @@ async def startup():
 
     # Start scheduler with default handlers
     from app.services.webhook_service import WebhookService
+    from app.services.confluence_service import ConfluenceService
+
     _webhook = WebhookService()
+    _confluence_svc = ConfluenceService()
+
     scheduler.service.register_handler("confluence_sync", _webhook.handle_confluence_sync)
     scheduler.service.register_handler("rag_query", _webhook.handle_rag_query)
+
+    # Confluence auto-sync: reads saved settings and syncs all configured spaces
+    async def _auto_confluence_sync(**kwargs):
+        from app.routers.settings import service as settings_svc
+        try:
+            conf = await settings_svc.get("confluence")
+            cfg = conf.get("data") if conf else None
+            if not cfg:
+                logger.info("Confluence auto-sync: no config saved, skipping")
+                return
+            base_url = cfg.get("base_url", "")
+            username = cfg.get("username", "")
+            api_token = cfg.get("api_token", "")
+            spaces = cfg.get("spaces", [])
+            if not base_url or not spaces:
+                logger.info("Confluence auto-sync: missing URL or spaces, skipping")
+                return
+            for space_key in spaces:
+                result = await _confluence_svc.sync_space(
+                    base_url=base_url, username=username, api_token=api_token,
+                    space_key=space_key, full_sync=False,
+                )
+                logger.info(f"Confluence auto-sync [{space_key}]: {result}")
+        except Exception as e:
+            logger.error(f"Confluence auto-sync error: {e}")
+
+    scheduler.service.register_handler("confluence_auto_sync", _auto_confluence_sync)
     await scheduler.service.start()
     logger.info("Scheduler started")
+
+    # 임베딩 모델 워밍업 — 백그라운드에서 비동기 로드
+    import asyncio
+    async def _warmup():
+        try:
+            from app.core.vector_store import get_vector_store
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                def _load():
+                    vs = get_vector_store()
+                    _ = vs.embedding_fn
+                await loop.run_in_executor(pool, _load)
+            logger.info("Embedding model warmed up")
+        except Exception as e:
+            logger.warning(f"Embedding warmup failed (non-critical): {e}")
+    asyncio.create_task(_warmup())
 
 
 @app.on_event("shutdown")

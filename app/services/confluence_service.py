@@ -8,12 +8,12 @@ from loguru import logger
 
 from app.connectors.confluence import ConfluenceConnector
 from app.core.document_loader import DocumentLoader
-from app.core.vector_store import VectorStore
+from app.core.vector_store import get_vector_store
 
 
 class ConfluenceService:
     def __init__(self):
-        self._vector_store = VectorStore()
+        self._vector_store = get_vector_store()
         self._doc_loader = DocumentLoader()
 
     async def sync_space(
@@ -68,11 +68,13 @@ class ConfluenceService:
         # 3. Chunk and index each page
         total_chunks = 0
         for page in pages:
-            chunks = self._doc_loader._chunk_text(page["text"])
+            # Semantic chunking (same pipeline as uploaded files)
+            chunks = self._doc_loader._semantic_chunk(page["text"])
             if not chunks:
                 continue
 
             doc_id = f"confluence_{page['id']}"
+            ids = [f"{doc_id}_{i}" for i in range(len(chunks))]
             metadatas = [
                 {
                     "filename": page["title"],
@@ -87,11 +89,10 @@ class ConfluenceService:
             ]
 
             col = self._vector_store._get_collection(collection, create=True)
-            ids = [f"{doc_id}_{i}" for i in range(len(chunks))]
 
             # Upsert — remove old chunks for this page, then add new
             try:
-                existing = col.get(where={"page_id": page["id"]})
+                existing = col.get(where={"doc_id": doc_id})
                 if existing["ids"]:
                     col.delete(ids=existing["ids"])
             except Exception:
@@ -99,6 +100,9 @@ class ConfluenceService:
 
             col.add(documents=chunks, ids=ids, metadatas=metadatas)
             total_chunks += len(chunks)
+
+        # Rebuild BM25 from ChromaDB to ensure hybrid search is in sync
+        self._vector_store.rebuild_bm25(collection)
 
         logger.info(
             f"Confluence sync complete: {len(pages)} pages, {total_chunks} chunks → '{collection}'"
@@ -121,11 +125,13 @@ class ConfluenceService:
         """List available Confluence spaces."""
         import httpx
 
+        from app.config import settings
         resp = httpx.get(
             f"{base_url.rstrip('/')}/rest/api/space",
             params={"limit": 100},
             auth=(username, api_token),
             timeout=30,
+            verify=settings.CONFLUENCE_VERIFY_SSL,
         )
         resp.raise_for_status()
         spaces = resp.json().get("results", [])

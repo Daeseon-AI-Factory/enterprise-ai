@@ -13,7 +13,7 @@ from app.services.rag_service import RagService
 from app.services.text2sql_service import Text2SqlService
 from app.services.codegen_service import CodegenService
 from app.services.review_service import ReviewService
-from app.core.vector_store import VectorStore
+from app.core.vector_store import get_vector_store
 
 
 class AgentService:
@@ -23,7 +23,7 @@ class AgentService:
         self._text2sql = Text2SqlService()
         self._codegen = CodegenService()
         self._review = ReviewService()
-        self._vector_store = VectorStore()
+        self._vector_store = get_vector_store()
         self._register_tools()
 
     def _register_tools(self) -> None:

@@ -7,7 +7,7 @@ from loguru import logger
 from app.llm_client import chat_completion
 from app.core.prompts import SYSTEM_CHAT
 from app.core.conversation_store import ConversationStore
-from app.core.vector_store import VectorStore
+from app.core.vector_store import get_vector_store
 
 
 SYSTEM_RAG_CHAT = """You are an enterprise AI assistant with access to a knowledge base.
@@ -24,7 +24,7 @@ SYSTEM_RAG_CHAT = """You are an enterprise AI assistant with access to a knowled
 class ChatService:
     def __init__(self):
         self._store = ConversationStore()
-        self._vector_store = VectorStore()
+        self._vector_store = get_vector_store()
 
     def _search_all_collections(self, query: str, top_k: int = 5) -> tuple[list[dict], str]:
         """Search across all RAG collections and build context."""
