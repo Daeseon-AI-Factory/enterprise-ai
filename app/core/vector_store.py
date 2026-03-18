@@ -249,20 +249,22 @@ class VectorStore:
     # ── Metadata queries ─────────────────────────────────────
 
     def list_collections(self) -> list[dict]:
+        # No embedding_fn needed — metadata only, avoids model cold-start
         collections = self.client.list_collections()
         result = []
         for name in collections:
             try:
-                col = self.client.get_collection(name=name if isinstance(name, str) else name.name)
+                col_name = name if isinstance(name, str) else name.name
+                col = self.client.get_collection(name=col_name)
                 result.append({"name": col.name, "count": col.count()})
             except Exception:
                 result.append({"name": str(name), "count": 0})
         return result
 
     def list_documents(self, collection: str) -> list[dict]:
-        """Return unique documents (filename + chunk count) in a collection."""
+        """Return unique documents (filename + chunk count) — no embedding model needed."""
         try:
-            col = self._get_collection(collection)
+            col = self.client.get_collection(name=collection)  # no embedding_fn
         except Exception:
             return []
         result = col.get(include=["metadatas"])
