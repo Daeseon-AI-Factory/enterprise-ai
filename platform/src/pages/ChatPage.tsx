@@ -9,15 +9,33 @@ interface Message {
   content: string;
 }
 
+const CHAT_SESSION = "chat_session";
+
+function loadChatSession() {
+  try {
+    const raw = sessionStorage.getItem(CHAT_SESSION);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
 export function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const saved = loadChatSession();
+  const [messages, setMessages] = useState<Message[]>(saved?.messages ?? []);
   const [loading, setLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [conversationId, setConversationId] = useState<string | undefined>(saved?.conversationId);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Persist messages and conversationId across navigation
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CHAT_SESSION, JSON.stringify({ messages, conversationId }));
+    } catch {}
+  }, [messages, conversationId]);
 
   const handleSend = async (text: string) => {
     setMessages((prev) => [...prev, { role: "user", content: text }]);

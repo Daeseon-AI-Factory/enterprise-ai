@@ -46,6 +46,11 @@ export const ragApi = {
       `/rag/collections/${collection}/documents`
     ),
 
+  getDocumentChunks: (collection: string, docId: string) =>
+    api.get<Array<{ chunk_index: number; content: string }>>(
+      `/rag/collections/${collection}/documents/${docId}/chunks`
+    ),
+
   deleteCollection: (id: string) => api.delete(`/rag/collections/${id}`),
 };
 

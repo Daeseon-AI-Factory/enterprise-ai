@@ -51,6 +51,12 @@ async def list_documents(collection_name: str):
     return await service.list_documents(collection_name)
 
 
+@router.get("/collections/{collection_name}/documents/{doc_id}/chunks")
+async def get_document_chunks(collection_name: str, doc_id: str):
+    """Get all chunks for a specific document (for preview)."""
+    return await service.get_document_chunks(collection_name, doc_id)
+
+
 @router.delete("/collections/{collection_id}")
 async def delete_collection(collection_id: str):
     """Delete a document collection."""

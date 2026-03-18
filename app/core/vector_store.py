@@ -277,6 +277,29 @@ class VectorStore:
             file_counts[fname]["chunks"] += 1
         return list(file_counts.values())
 
+    def get_document_chunks(self, collection: str, doc_id: str) -> list[dict]:
+        """Return all chunks for a specific document (for preview)."""
+        try:
+            col = self.client.get_collection(name=collection)
+        except Exception:
+            return []
+        result = col.get(
+            where={"doc_id": doc_id},
+            include=["documents", "metadatas"],
+        )
+        chunks = []
+        for i, (doc_id_val, doc, meta) in enumerate(zip(
+            result.get("ids", []),
+            result.get("documents", []),
+            result.get("metadatas", []),
+        )):
+            chunks.append({
+                "chunk_index": meta.get("chunk_index", i),
+                "content": doc,
+            })
+        chunks.sort(key=lambda x: x["chunk_index"])
+        return chunks
+
     def delete_collection(self, collection_id: str) -> None:
         self.client.delete_collection(name=collection_id)
         self._bm25.delete_collection(collection_id)
