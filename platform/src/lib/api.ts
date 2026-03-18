@@ -41,6 +41,11 @@ export const ragApi = {
   listCollections: () =>
     api.get<Array<{ name: string; count: number }>>("/rag/collections"),
 
+  listDocuments: (collection: string) =>
+    api.get<Array<{ filename: string; doc_id: string; chunks: number }>>(
+      `/rag/collections/${collection}/documents`
+    ),
+
   deleteCollection: (id: string) => api.delete(`/rag/collections/${id}`),
 };
 

@@ -95,6 +95,9 @@ class RagService:
     async def list_collections(self) -> list[dict]:
         return self._vector_store.list_collections()
 
+    async def list_documents(self, collection: str) -> list[dict]:
+        return self._vector_store.list_documents(collection)
+
     async def delete_collection(self, collection_id: str) -> None:
         self._vector_store.delete_collection(collection_id)
         logger.info(f"Deleted collection: {collection_id}")

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ragApi } from "@/lib/api";
-import { Send, FileText, Trash2 } from "lucide-react";
+import { Send, FileText, Trash2, ChevronDown, ChevronRight, FolderOpen } from "lucide-react";
 
 interface Source {
   filename: string;
@@ -18,6 +18,12 @@ interface Collection {
   count: number;
 }
 
+interface DocFile {
+  filename: string;
+  doc_id: string;
+  chunks: number;
+}
+
 export function RagPage() {
   const [query, setQuery] = useState("");
   const [answer, setAnswer] = useState("");
@@ -26,6 +32,9 @@ export function RagPage() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [collections, setCollections] = useState<Collection[]>([]);
   const [activeCollection, setActiveCollection] = useState("default");
+  const [expandedCol, setExpandedCol] = useState<string | null>(null);
+  const [colDocs, setColDocs] = useState<Record<string, DocFile[]>>({});
+  const [loadingDocs, setLoadingDocs] = useState<string | null>(null);
 
   const handleUpload = async (files: File[]) => {
     setUploadStatus("업로드 중...");
@@ -66,9 +75,30 @@ export function RagPage() {
     }
   };
 
+  const toggleCollection = async (name: string) => {
+    if (expandedCol === name) {
+      setExpandedCol(null);
+      return;
+    }
+    setExpandedCol(name);
+    if (!colDocs[name]) {
+      setLoadingDocs(name);
+      try {
+        const res = await ragApi.listDocuments(name);
+        setColDocs((prev) => ({ ...prev, [name]: res.data }));
+      } catch {
+        setColDocs((prev) => ({ ...prev, [name]: [] }));
+      } finally {
+        setLoadingDocs(null);
+      }
+    }
+  };
+
   const deleteCollection = async (name: string) => {
     try {
       await ragApi.deleteCollection(name);
+      setColDocs((prev) => { const next = { ...prev }; delete next[name]; return next; });
+      if (expandedCol === name) setExpandedCol(null);
       loadCollections();
     } catch {
       // ignore
@@ -93,7 +123,16 @@ export function RagPage() {
 
         <TabsContent value="query" className="space-y-4">
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 space-y-3">
+              <div className="flex gap-2 items-center">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">컬렉션:</span>
+                <Input
+                  value={activeCollection}
+                  onChange={(e) => setActiveCollection(e.target.value)}
+                  placeholder="default"
+                  className="max-w-[180px]"
+                />
+              </div>
               <div className="flex gap-2">
                 <Input
                   value={query}
@@ -134,7 +173,7 @@ export function RagPage() {
         <TabsContent value="upload" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">컬렉션</CardTitle>
+              <CardTitle className="text-base">업로드할 컬렉션</CardTitle>
             </CardHeader>
             <CardContent>
               <Input
@@ -158,18 +197,58 @@ export function RagPage() {
           <Card>
             <CardContent className="pt-6">
               {collections.length === 0 ? (
-                <p className="text-sm text-muted-foreground">컬렉션이 없습니다</p>
+                <p className="text-sm text-muted-foreground">컬렉션이 없습니다. 문서를 업로드하면 여기에 표시됩니다.</p>
               ) : (
                 <div className="space-y-2">
                   {collections.map((c) => (
-                    <div key={c.name} className="flex items-center justify-between rounded-lg border px-4 py-3">
-                      <div>
-                        <span className="font-medium">{c.name}</span>
-                        <span className="text-sm text-muted-foreground ml-2">({c.count}개 문서)</span>
+                    <div key={c.name} className="rounded-lg border overflow-hidden">
+                      {/* Collection header */}
+                      <div
+                        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleCollection(c.name)}
+                      >
+                        <div className="flex items-center gap-2">
+                          {expandedCol === c.name
+                            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          }
+                          <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{c.name}</span>
+                          <span className="text-sm text-muted-foreground">
+                            ({c.count}개 청크)
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); deleteCollection(c.name); }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => deleteCollection(c.name)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+
+                      {/* File list (expanded) */}
+                      {expandedCol === c.name && (
+                        <div className="border-t bg-muted/20 px-4 py-2">
+                          {loadingDocs === c.name ? (
+                            <p className="text-sm text-muted-foreground py-2">로딩 중...</p>
+                          ) : (colDocs[c.name] ?? []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-2">파일 없음</p>
+                          ) : (
+                            <div className="space-y-1 py-1">
+                              {(colDocs[c.name] ?? []).map((doc, i) => (
+                                <div key={i} className="flex items-center gap-2 text-sm py-1">
+                                  <FileText className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                  <span className="flex-1 truncate">{doc.filename}</span>
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    {doc.chunks}청크
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

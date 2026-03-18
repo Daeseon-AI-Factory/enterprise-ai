@@ -45,6 +45,12 @@ async def list_collections():
     return await service.list_collections()
 
 
+@router.get("/collections/{collection_name}/documents")
+async def list_documents(collection_name: str):
+    """List all documents (files) in a collection."""
+    return await service.list_documents(collection_name)
+
+
 @router.delete("/collections/{collection_id}")
 async def delete_collection(collection_id: str):
     """Delete a document collection."""

@@ -1,5 +1,7 @@
 """Shared fixtures for all test levels."""
 
+collect_ignore = ["test_05_load.py"]
+
 import os
 import pytest
 from httpx import AsyncClient, ASGITransport

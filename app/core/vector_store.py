@@ -103,5 +103,21 @@ class VectorStore:
                 result.append({"name": str(name), "count": 0})
         return result
 
+    def list_documents(self, collection: str) -> list[dict]:
+        """Return unique documents (filename + chunk count) in a collection."""
+        try:
+            col = self._get_collection(collection)
+        except Exception:
+            return []
+        result = col.get(include=["metadatas"])
+        file_counts: dict[str, dict] = {}
+        for meta in result.get("metadatas") or []:
+            fname = meta.get("filename", "unknown")
+            doc_id = meta.get("doc_id", "")
+            if fname not in file_counts:
+                file_counts[fname] = {"filename": fname, "doc_id": doc_id, "chunks": 0}
+            file_counts[fname]["chunks"] += 1
+        return list(file_counts.values())
+
     def delete_collection(self, collection_id: str) -> None:
         self.client.delete_collection(name=collection_id)

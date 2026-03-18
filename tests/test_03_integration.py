@@ -131,7 +131,7 @@ class TestSchedulerAPI:
         r = client.post("/api/scheduler/create", json={
             "name": "integration_test_schedule",
             "handler_name": "confluence_sync",
-            "cron_expr": "0 3 * * *",
+            "interval_minutes": 180,
         })
         assert r.status_code == 200
 
