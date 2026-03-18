@@ -58,26 +58,34 @@ class RagService:
         top_k: int = 5,
     ) -> dict:
         """Query documents using RAG pipeline. collection='all' searches every collection."""
-        # Search all collections or a specific one
+        # Search all collections or a specific one (hybrid: dense + BM25 + rerank)
         if collection in ("all", "", "*"):
             all_results = []
             for col in self._vector_store.list_collections():
                 col_name = col["name"]
                 try:
-                    hits = self._vector_store.search(collection=col_name, query=query, top_k=top_k)
+                    hits = self._vector_store.hybrid_search(
+                        collection=col_name, query=query, top_k=top_k
+                    )
                     for h in hits:
                         h["collection"] = col_name
                     all_results.extend(hits)
                 except Exception as e:
-                    logger.warning(f"Search failed in '{col_name}': {e}")
-            all_results.sort(key=lambda x: x.get("score", 999))
+                    logger.warning(f"Hybrid search failed in '{col_name}': {e}")
+            # Final cross-collection rerank by rerank_score
+            all_results.sort(key=lambda x: x.get("rerank_score", x.get("score", 0)), reverse=True)
             results = all_results[:top_k]
-            logger.info(f"RAG query (all collections): '{query[:50]}' → {len(results)} chunks")
+            logger.info(
+                f"RAG hybrid (all collections): '{query[:50]}' → {len(results)} chunks "
+                f"from {list(set(r.get('collection','') for r in results))}"
+            )
         else:
-            results = self._vector_store.search(collection=collection, query=query, top_k=top_k)
+            results = self._vector_store.hybrid_search(
+                collection=collection, query=query, top_k=top_k
+            )
             for r in results:
                 r["collection"] = collection
-            logger.info(f"RAG query ('{collection}'): '{query[:50]}' → {len(results)} chunks")
+            logger.info(f"RAG hybrid ('{collection}'): '{query[:50]}' → {len(results)} chunks")
 
         # Build context from retrieved docs
         context_parts = []

@@ -38,7 +38,7 @@ class ChatService:
         for col in collections:
             col_name = col.get("name", col) if isinstance(col, dict) else str(col)
             try:
-                results = self._vector_store.search(
+                results = self._vector_store.hybrid_search(
                     collection=col_name,
                     query=query,
                     top_k=top_k,
@@ -52,8 +52,8 @@ class ChatService:
         if not all_results:
             return [], ""
 
-        # Sort by score (lower = more relevant for distance-based)
-        all_results.sort(key=lambda x: x.get("score", 999))
+        # Sort by rerank_score (higher = more relevant after reranking)
+        all_results.sort(key=lambda x: x.get("rerank_score", x.get("score", 0)), reverse=True)
         top_results = all_results[:top_k]
 
         # Build context string
