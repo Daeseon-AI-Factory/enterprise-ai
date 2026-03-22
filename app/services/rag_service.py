@@ -58,6 +58,11 @@ class RagService:
         top_k: int = 5,
     ) -> dict:
         """Query documents using RAG pipeline. collection='all' searches every collection."""
+        if not self._vector_store.embedding_available:
+            return {
+                "answer": "임베딩 모델이 설치되지 않았습니다. models/embedding/ 폴더에 모델을 복사해주세요.",
+                "sources": [],
+            }
         # Search all collections or a specific one (hybrid: dense + BM25 + rerank)
         if collection in ("all", "", "*"):
             all_results = []
@@ -93,12 +98,17 @@ class RagService:
         for doc in results:
             col_label = doc.get("collection", "")
             context_parts.append(f"[{col_label}/{doc.get('filename','?')}]\n{doc['content']}")
-            sources.append({
+            source_entry = {
                 "filename": doc.get("filename", "unknown"),
                 "collection": col_label,
                 "chunk_id": doc.get("id", ""),
                 "score": doc.get("score", 0),
-            })
+            }
+            if doc.get("page_url"):
+                source_entry["page_url"] = doc["page_url"]
+            if doc.get("source"):
+                source_entry["source"] = doc["source"]
+            sources.append(source_entry)
 
         context = "\n\n---\n\n".join(context_parts)
 

@@ -28,7 +28,7 @@ export function GitPage() {
 
   // ── Query tab ──
   const [query, setQuery] = useState("");
-  const [queryCollection, setQueryCollection] = useState("all");
+  const [queryCollection, setQueryCollection] = useState("");
   const [answer, setAnswer] = useState("");
   const [querying, setQuerying] = useState(false);
 
@@ -37,10 +37,13 @@ export function GitPage() {
     try {
       const res = await gitApi.listCollections();
       setCollections(res.data);
+      if (res.data.length > 0 && !queryCollection) {
+        setQueryCollection(res.data[0].name);
+      }
     } catch { /* ignore */ } finally {
       setLoadingCols(false);
     }
-  }, []);
+  }, [queryCollection]);
 
   useEffect(() => {
     loadCollections();
@@ -208,7 +211,7 @@ export function GitPage() {
                   value={queryCollection}
                   onChange={e => setQueryCollection(e.target.value)}
                 >
-                  <option value="all">전체</option>
+                  <option value="">-- 컬렉션 선택 --</option>
                   {collections.map(c => (
                     <option key={c.name} value={c.name}>{c.name} ({c.count}청크)</option>
                   ))}

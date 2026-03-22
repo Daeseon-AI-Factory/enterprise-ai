@@ -116,6 +116,90 @@ class ConfluenceService:
             "total_chunks": total_chunks,
         }
 
+    async def register_page_by_url(
+        self,
+        page_url: str,
+        base_url: str,
+        username: str,
+        api_token: str,
+        collection: str = "confluence_pages",
+    ) -> dict:
+        """Confluence 페이지 URL을 받아서 API로 콘텐츠를 가져와 RAG에 등록.
+
+        URL 형식 예시:
+          - https://company.atlassian.net/wiki/spaces/MES/pages/12345/페이지제목
+          - https://company.atlassian.net/wiki/pages/viewpage.action?pageId=12345
+        """
+        import re
+
+        # URL에서 page_id 추출
+        page_id = None
+        # 패턴 1: /pages/12345/...
+        m = re.search(r"/pages/(\d+)", page_url)
+        if m:
+            page_id = m.group(1)
+        # 패턴 2: ?pageId=12345
+        if not page_id:
+            m = re.search(r"pageId=(\d+)", page_url)
+            if m:
+                page_id = m.group(1)
+
+        if not page_id:
+            return {"status": "error", "message": "URL에서 page ID를 추출할 수 없습니다."}
+
+        # API 호출로 페이지 콘텐츠 가져오기
+        connector = ConfluenceConnector(base_url, username, api_token)
+        page = connector.fetch_single_page(page_id)
+
+        if not page:
+            return {"status": "error", "message": f"페이지 {page_id}를 찾을 수 없습니다."}
+
+        if not page["text"].strip():
+            return {"status": "error", "message": "페이지 콘텐츠가 비어있습니다."}
+
+        # Semantic chunking
+        chunks = self._doc_loader._semantic_chunk(page["text"])
+        if not chunks:
+            return {"status": "error", "message": "청크 생성 실패."}
+
+        doc_id = f"confluence_{page_id}"
+        ids = [f"{doc_id}_{i}" for i in range(len(chunks))]
+        metadatas = [
+            {
+                "filename": page["title"],
+                "chunk_index": i,
+                "doc_id": doc_id,
+                "source": "confluence",
+                "page_id": page_id,
+                "page_url": page["url"],
+            }
+            for i in range(len(chunks))
+        ]
+
+        col = self._vector_store._get_collection(collection, create=True)
+
+        # 기존 청크 제거 후 새로 추가 (upsert)
+        try:
+            existing = col.get(where={"doc_id": doc_id})
+            if existing["ids"]:
+                col.delete(ids=existing["ids"])
+        except Exception:
+            pass
+
+        col.add(documents=chunks, ids=ids, metadatas=metadatas)
+        self._vector_store.rebuild_bm25(collection)
+
+        logger.info(f"Confluence page registered: '{page['title']}' ({len(chunks)} chunks) → '{collection}'")
+
+        return {
+            "status": "registered",
+            "title": page["title"],
+            "page_id": page_id,
+            "page_url": page["url"],
+            "collection": collection,
+            "chunks": len(chunks),
+        }
+
     async def list_spaces(
         self,
         base_url: str,

@@ -21,9 +21,14 @@ interface DbConn {
 
 const DEFAULT_CONN: DbConn = {
   db_type: "oracle", host: "localhost", port: "1521",
-  database: "ORCL", username: "", password: "",
-  owner: "", description: "", schema_id: "",
+  database: "XEPDB1", username: "MESADMIN", password: "mesadmin123",
+  owner: "", description: "", schema_id: "mes_oracle",
 };
+
+interface SqlHistoryEntry {
+  question: string; sql: string; explanation: string;
+  columns: string[]; rows: Record<string, unknown>[]; timestamp: string;
+}
 
 export function SqlPage() {
   // ── Query tab ──
@@ -35,6 +40,7 @@ export function SqlPage() {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [sqlHistory, setSqlHistory] = useState<SqlHistoryEntry[]>([]);
 
   // ── Schema tab ──
   const [schemas, setSchemas] = useState<Schema[]>([]);
@@ -81,9 +87,17 @@ export function SqlPage() {
     setExecuting(true);
     try {
       const res = await sqlApi.execute(sql);
-      if (res.data.columns) setColumns(res.data.columns);
-      if (res.data.rows) setRows(res.data.rows);
+      const cols = res.data.columns || [];
+      const rws = res.data.rows || [];
+      setColumns(cols);
+      setRows(rws);
       if (res.data.message) setExplanation(res.data.message);
+      // 히스토리에 저장
+      setSqlHistory(prev => [...prev, {
+        question, sql, explanation,
+        columns: cols, rows: rws,
+        timestamp: new Date().toLocaleTimeString("ko-KR"),
+      }]);
     } catch {
       setExplanation("SQL 실행 실패.");
     } finally {
@@ -99,12 +113,15 @@ export function SqlPage() {
         db_type: conn.db_type,
         host: conn.host,
         port: parseInt(conn.port) || 1521,
-        database: conn.database,
-        username: conn.username,
+        name: conn.database,
+        user: conn.username,
         password: conn.password,
-        oracle_service: conn.db_type === "oracle" ? conn.database : undefined,
       });
-      setTestResult({ ok: true, msg: res.data.message || `연결 성공 (테이블 ${res.data.tables_found ?? "?"}개)` });
+      if (res.data.ok) {
+        setTestResult({ ok: true, msg: "연결 성공" });
+      } else {
+        setTestResult({ ok: false, msg: res.data.error || "연결 실패" });
+      }
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "연결 실패";
       setTestResult({ ok: false, msg });
@@ -126,13 +143,13 @@ export function SqlPage() {
         db_type: conn.db_type,
         host: conn.host,
         port: parseInt(conn.port) || 1521,
-        database: conn.database,
-        username: conn.username,
+        name: conn.database,
+        user: conn.username,
         password: conn.password,
         owner: conn.owner || undefined,
         description: conn.description || undefined,
       });
-      setDiscoverResult(`✓ ${res.data.table_count}개 테이블 탐색 완료 (ID: ${res.data.schema_id})`);
+      setDiscoverResult(`✓ ${res.data.tables}개 테이블 탐색 완료 (ID: ${res.data.schema_id})`);
       loadSchemas();
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "스키마 탐색 실패";
@@ -231,6 +248,30 @@ export function SqlPage() {
                 <SqlResultTable columns={columns} rows={rows} />
               </CardContent>
             </Card>
+          )}
+
+          {/* 질의 히스토리 */}
+          {sqlHistory.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">{sqlHistory.length}개 질의 기록</span>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setSqlHistory([])}>기록 지우기</Button>
+              </div>
+              {[...sqlHistory].reverse().map((entry, idx) => (
+                <Card key={idx} className="bg-muted/30">
+                  <CardContent className="pt-4 pb-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{entry.question}</p>
+                      <span className="text-xs text-muted-foreground">{entry.timestamp}</span>
+                    </div>
+                    <CodeBlock code={entry.sql} language="sql" />
+                    {entry.columns.length > 0 && (
+                      <SqlResultTable columns={entry.columns} rows={entry.rows} />
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </TabsContent>
 

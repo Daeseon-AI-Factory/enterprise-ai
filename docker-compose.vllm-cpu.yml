@@ -1,0 +1,26 @@
+# vLLM CPU-only variant (GPU 없는 환경 테스트용, 매우 느림)
+# Usage:
+#   docker compose -f docker-compose.vllm-cpu.yml up -d
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models/llm:/root/.cache/huggingface
+    environment:
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - VLLM_TARGET_DEVICE=cpu
+    command: >
+      --model ${VLLM_MODEL:-mistralai/Mistral-7B-Instruct-v0.3}
+      --served-model-name ${VLLM_SERVED_NAME:-mistral-7b}
+      --host 0.0.0.0
+      --port 8000
+      --max-model-len 2048
+      --dtype float32
+      --device cpu
+      --trust-remote-code
+    restart: unless-stopped

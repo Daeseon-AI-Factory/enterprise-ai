@@ -146,6 +146,21 @@ When working with me:
 6. **Remember the Deterministic Backbone.** If it can be deterministic, make it deterministic. Only use AI where judgment is needed.
 7. **Respect the factory-core boundary.** Core modules never depend on product code. Products depend on core. Never the reverse.
 8. **Prioritize revenue impact.** When in doubt, build the thing that gets us closer to someone paying.
+9. **"끝"이라고 말하기 전에 반드시 검증하라.**
+   - requirements.txt에 있는 모든 import가 포함되어 있는지 `grep`으로 확인
+   - 패키지 배포 시 대상 환경(Python 버전, OS, 아키텍처)을 먼저 확인
+   - 오프라인 배포 시 가상환경에서 실제 설치 테스트 후 freeze한 목록만 사용
+   - "확실하냐"고 물으면 코드/파일을 실제로 검증한 후에만 "네"라고 답할 것
+   - 검증 없이 추측으로 "끝"이라 하지 말 것
+10. **폐쇄망 배포 체크리스트 (ZIP 만들기 전 필수)**
+    - [ ] 대상 Python 버전, OS, 아키텍처 확인
+    - [ ] 코드의 모든 import가 requirements.txt에 있는지 grep 대조
+    - [ ] 가상환경 설치 → pip freeze → 전체 목록으로 오프라인 패키지 다운로드
+    - [ ] node_modules 오프라인 포함 또는 내부 레지스트리 유무 확인
+    - [ ] 임베딩 모델 포함 여부 확인
+    - [ ] .env 설정 파일 포함
+    - [ ] install.bat/스크립트 포함
+    - [ ] 가상환경에서 실제 오프라인 설치 테스트
 
 ---
 

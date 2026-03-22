@@ -8,10 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ragApi } from "@/lib/api";
 import {
   Send, FileText, Trash2, ChevronDown, ChevronRight,
-  FolderOpen, Eye, X, Loader2,
+  FolderOpen, Eye, X, Loader2, ExternalLink,
 } from "lucide-react";
 
-interface Source { filename: string; collection: string; score: number }
+interface Source { filename: string; collection: string; chunk_id: string; score: number; page_url?: string; source?: string }
 interface Collection { name: string; count: number }
 interface DocFile { filename: string; doc_id: string; chunks: number }
 interface Chunk { chunk_index: number; content: string }
@@ -29,10 +29,11 @@ function loadSession<T>(key: string, fallback: T): T {
   return fallback;
 }
 
+interface HistoryEntry { query: string; answer: string; sources: Source[]; timestamp: string }
+
 export function RagPage() {
-  const [query, setQuery] = useState(() => loadSession("query", ""));
-  const [answer, setAnswer] = useState(() => loadSession("answer", ""));
-  const [sources, setSources] = useState<Source[]>(() => loadSession("sources", []));
+  const [query, setQuery] = useState("");
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadSession("history", []));
   const [loadingStep, setLoadingStep] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -42,14 +43,14 @@ export function RagPage() {
   const [loadingDocs, setLoadingDocs] = useState<string | null>(null);
 
   // Document preview modal
-  const [previewDoc, setPreviewDoc] = useState<{ filename: string; collection: string; doc_id: string } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ filename: string; collection: string; doc_id: string; page_url?: string } | null>(null);
   const [previewChunks, setPreviewChunks] = useState<Chunk[]>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
-  // Persist state across tab navigation
+  // Persist history
   useEffect(() => {
-    saveSession({ query, answer, sources, activeCollection });
-  }, [query, answer, sources, activeCollection]);
+    saveSession({ history, activeCollection });
+  }, [history, activeCollection]);
 
   const handleUpload = async (files: File[]) => {
     setUploadStatus("업로드 중...");
@@ -66,20 +67,30 @@ export function RagPage() {
 
   const handleQuery = async () => {
     if (!query.trim()) return;
+    const currentQuery = query;
+    setQuery("");
     setLoadingStep("문서 검색 중...");
-    setAnswer("");
-    setSources([]);
 
     try {
-      // Small delay so the first step message is visible
       await new Promise(r => setTimeout(r, 300));
       setLoadingStep("관련 문서 분석 중...");
 
-      const res = await ragApi.query(query, activeCollection);
-      setAnswer(res.data.answer);
-      setSources(res.data.sources as Source[]);
+      const res = await ragApi.query(currentQuery, activeCollection);
+      const entry: HistoryEntry = {
+        query: currentQuery,
+        answer: res.data.answer,
+        sources: res.data.sources as Source[],
+        timestamp: new Date().toLocaleTimeString("ko-KR"),
+      };
+      setHistory(prev => [...prev, entry]);
     } catch {
-      setAnswer("질의 실패. 문서가 업로드되었는지 확인해주세요.");
+      const entry: HistoryEntry = {
+        query: currentQuery,
+        answer: "질의 실패. 문서가 업로드되었는지 확인해주세요.",
+        sources: [],
+        timestamp: new Date().toLocaleTimeString("ko-KR"),
+      };
+      setHistory(prev => [...prev, entry]);
     } finally {
       setLoadingStep("");
     }
@@ -187,29 +198,58 @@ export function RagPage() {
             </CardContent>
           </Card>
 
-          {answer && (
-            <Card>
-              <CardContent className="pt-6">
-                <ChatMessage role="assistant" content={answer} />
-                {sources.length > 0 && (
-                  <div className="mt-4 border-t pt-4">
-                    <h4 className="text-sm font-medium mb-2">참고 문서 ({sources.length}개)</h4>
-                    <div className="space-y-1">
-                      {sources.map((s, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <FileText className="h-3 w-3 flex-shrink-0" />
-                          <span className="font-medium text-foreground">{s.filename}</span>
-                          <span className="text-xs text-muted-foreground">({s.collection})</span>
-                          <span className="text-xs ml-auto">
-                            유사도 {(s.score * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                      ))}
+          {/* History */}
+          {history.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">{history.length}개 질의</span>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setHistory([])}>기록 지우기</Button>
+              </div>
+              {history.map((entry, idx) => (
+                <Card key={idx}>
+                  <CardContent className="pt-4 pb-3 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs font-medium bg-primary text-primary-foreground rounded px-1.5 py-0.5 mt-0.5">Q</span>
+                      <p className="text-sm font-medium">{entry.query}</p>
+                      <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">{entry.timestamp}</span>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                    <ChatMessage role="assistant" content={entry.answer} />
+                    {entry.sources.length > 0 && (
+                      <div className="border-t pt-3">
+                        <h4 className="text-xs font-medium mb-1.5 text-muted-foreground">참고 문서 ({entry.sources.length}개)</h4>
+                        <div className="space-y-1">
+                          {entry.sources.map((s, i) => {
+                            const docId = s.chunk_id?.replace(/_\d+$/, "") || s.filename;
+                            return (
+                              <div
+                                key={i}
+                                className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 rounded px-2 py-1 -mx-2 transition-colors"
+                                onClick={() => {
+                                  openPreview({ filename: s.filename, doc_id: docId, chunks: 0 }, s.collection);
+                                  if (s.page_url) setPreviewDoc(prev => prev ? { ...prev, page_url: s.page_url } : prev);
+                                }}
+                              >
+                                <Eye className="h-3 w-3 flex-shrink-0 text-blue-500" />
+                                <span className="font-medium text-foreground hover:underline">{s.filename}</span>
+                                <span className="text-xs text-muted-foreground">({s.collection})</span>
+                                {s.page_url && (
+                                  <a href={s.page_url} target="_blank" rel="noopener noreferrer"
+                                    className="ml-1 text-blue-500 hover:text-blue-700"
+                                    onClick={e => e.stopPropagation()} title="Confluence 원본 열기">
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                                <span className="text-xs ml-auto">유사도 {(s.score * 100).toFixed(0)}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </TabsContent>
 
@@ -336,7 +376,19 @@ export function RagPage() {
             <div className="flex items-center justify-between px-5 py-3 border-b">
               <div>
                 <h3 className="font-semibold">{previewDoc.filename}</h3>
-                <p className="text-xs text-muted-foreground">컬렉션: {previewDoc.collection}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">컬렉션: {previewDoc.collection}</p>
+                  {previewDoc.page_url && (
+                    <a
+                      href={previewDoc.page_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-500 hover:underline flex items-center gap-1"
+                    >
+                      <ExternalLink className="h-3 w-3" /> 원본 보기
+                    </a>
+                  )}
+                </div>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setPreviewDoc(null)}>
                 <X className="h-4 w-4" />

@@ -1,0 +1,41 @@
+# vLLM — OpenAI-compatible local LLM server (GPU required)
+# Usage:
+#   docker compose -f docker-compose.vllm.yml up -d
+#   curl http://localhost:8000/v1/models
+#
+# Pair with main platform:
+#   docker compose -f docker-compose.airgap.yml -f docker-compose.vllm.yml up -d
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models/llm:/root/.cache/huggingface
+    environment:
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      --model ${VLLM_MODEL:-mistralai/Mistral-7B-Instruct-v0.3}
+      --served-model-name ${VLLM_SERVED_NAME:-mistral-7b}
+      --host 0.0.0.0
+      --port 8000
+      --max-model-len ${VLLM_MAX_MODEL_LEN:-4096}
+      --dtype ${VLLM_DTYPE:-auto}
+      --trust-remote-code
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s

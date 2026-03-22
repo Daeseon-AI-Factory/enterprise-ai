@@ -114,11 +114,11 @@ export const sqlApi = {
   deleteSchema: (schemaId: string) =>
     api.delete(`/text2sql/schemas/${schemaId}`),
 
-  testConnection: (params: { db_type: string; host: string; port: number; database: string; username: string; password: string; oracle_service?: string }) =>
-    api.post<{ status: string; message: string; tables_found?: number }>("/text2sql/connection/test", params),
+  testConnection: (params: { db_type: string; host: string; port: number; name: string; user: string; password: string }) =>
+    api.post<{ ok: boolean; error?: string }>("/text2sql/connection/test", params),
 
-  discoverSchema: (params: { schema_id: string; db_type: string; host: string; port: number; database: string; username: string; password: string; owner?: string; description?: string }) =>
-    api.post<{ schema_id: string; table_count: number; tables: unknown[] }>("/text2sql/schema/discover", params),
+  discoverSchema: (params: { schema_id: string; db_type: string; host: string; port: number; name: string; user: string; password: string; owner?: string; description?: string }) =>
+    api.post<{ schema_id: string; tables: number; status: string }>("/text2sql/schema/discover", params),
 };
 
 // Codegen
@@ -155,6 +155,18 @@ export const confluenceApi = {
 
   listSpaces: (params: { base_url: string; username: string; api_token: string }) =>
     api.post<Array<{ key: string; name: string; type: string }>>("/confluence/spaces", params),
+
+  registerPage: (params: {
+    page_url: string;
+    base_url: string;
+    username: string;
+    api_token: string;
+    collection?: string;
+  }) =>
+    api.post<{ status: string; title?: string; chunks?: number; message?: string }>(
+      "/confluence/register-page",
+      params
+    ),
 };
 
 // Review (Code Review + Edge Case)

@@ -52,3 +52,20 @@ async def list_spaces(conn: ConfluenceConnection):
         api_token=conn.api_token,
     )
     return spaces
+
+
+class RegisterPageRequest(ConfluenceConnection):
+    page_url: str  # Confluence 페이지 URL
+    collection: str = "confluence_pages"
+
+
+@router.post("/register-page")
+async def register_page(req: RegisterPageRequest):
+    """Confluence 페이지 URL을 입력하면 API로 콘텐츠를 가져와 RAG에 등록."""
+    return await service.register_page_by_url(
+        page_url=req.page_url,
+        base_url=req.base_url,
+        username=req.username,
+        api_token=req.api_token,
+        collection=req.collection,
+    )

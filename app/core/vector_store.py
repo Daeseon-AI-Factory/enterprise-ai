@@ -25,6 +25,15 @@ class VectorStore:
     # ── Lazy init ────────────────────────────────────────────
 
     @property
+    def embedding_available(self) -> bool:
+        """임베딩 모델이 로드 가능한지 확인."""
+        if self._embedding_fn is not None:
+            return True
+        import os
+        model_path = settings.EMBEDDING_MODEL_PATH
+        return os.path.exists(model_path) and os.path.isdir(model_path)
+
+    @property
     def embedding_fn(self) -> SentenceTransformerEmbeddingFunction:
         if self._embedding_fn is None:
             model_path = settings.EMBEDDING_MODEL_PATH
@@ -121,13 +130,19 @@ class VectorStore:
         results = col.query(query_texts=[query], n_results=n)
         docs = []
         for i in range(len(results["ids"][0])):
-            docs.append({
+            meta = results["metadatas"][0][i]
+            doc = {
                 "id": results["ids"][0][i],
                 "content": results["documents"][0][i],
-                "filename": results["metadatas"][0][i].get("filename", "unknown"),
-                "doc_id": results["metadatas"][0][i].get("doc_id", ""),
+                "filename": meta.get("filename", "unknown"),
+                "doc_id": meta.get("doc_id", ""),
                 "score": results["distances"][0][i] if results.get("distances") else 0,
-            })
+            }
+            if meta.get("page_url"):
+                doc["page_url"] = meta["page_url"]
+            if meta.get("source"):
+                doc["source"] = meta["source"]
+            docs.append(doc)
         return docs
 
     # ── Hybrid search (Dense + BM25 + RRF + Reranker) ───────

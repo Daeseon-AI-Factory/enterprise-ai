@@ -38,6 +38,12 @@ export function ConfluencePage() {
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [error, setError] = useState("");
 
+  // URL 단건 등록
+  const [pageUrl, setPageUrl] = useState("");
+  const [pageCollection, setPageCollection] = useState("confluence_pages");
+  const [registering, setRegistering] = useState(false);
+  const [registerResult, setRegisterResult] = useState<{ status: string; title?: string; chunks?: number; message?: string } | null>(null);
+
   const handleConnect = async () => {
     if (!baseUrl.trim() || !username.trim() || !apiToken.trim()) return;
     setLoadingSpaces(true);
@@ -55,6 +61,30 @@ export function ConfluencePage() {
       setConnected(false);
     } finally {
       setLoadingSpaces(false);
+    }
+  };
+
+  const handleRegisterPage = async () => {
+    if (!pageUrl.trim() || !baseUrl.trim() || !username.trim() || !apiToken.trim()) return;
+    setRegistering(true);
+    setRegisterResult(null);
+    setError("");
+    try {
+      const res = await confluenceApi.registerPage({
+        page_url: pageUrl,
+        base_url: baseUrl,
+        username,
+        api_token: apiToken,
+        collection: pageCollection || "confluence_pages",
+      });
+      setRegisterResult(res.data);
+      if (res.data.status === "error") {
+        setError(res.data.message || "등록 실패");
+      }
+    } catch {
+      setError("페이지 등록 실패. URL과 연결 설정을 확인해주세요.");
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -124,6 +154,48 @@ export function ConfluencePage() {
             )}
             연결 테스트
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* URL 단건 등록 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">페이지 URL로 등록</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Confluence 페이지 URL을 붙여넣으면 API로 콘텐츠를 가져와 RAG에 등록합니다
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input
+            value={pageUrl}
+            onChange={(e) => setPageUrl(e.target.value)}
+            placeholder="예: https://company.atlassian.net/wiki/spaces/MES/pages/12345/페이지제목"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium mb-1 block">컬렉션 이름</label>
+              <Input
+                value={pageCollection}
+                onChange={(e) => setPageCollection(e.target.value)}
+                placeholder="confluence_pages"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={handleRegisterPage} disabled={registering || !pageUrl.trim() || !baseUrl.trim()}>
+                {registering ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Link className="h-4 w-4 mr-2" />}
+                페이지 등록
+              </Button>
+            </div>
+          </div>
+          {!baseUrl.trim() && (
+            <p className="text-xs text-orange-500">* 위 연결 설정(URL, 사용자명, API 토큰)을 먼저 입력해주세요</p>
+          )}
+          {registerResult && registerResult.status === "registered" && (
+            <div className="flex items-center gap-2 text-green-600 text-sm">
+              <CheckCircle className="h-4 w-4" />
+              <span>"{registerResult.title}" 등록 완료 ({registerResult.chunks}청크)</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
