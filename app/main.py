@@ -82,11 +82,50 @@ app.include_router(vision.router, prefix="/api/vision", tags=["Vision"])
 
 
 @app.get("/health")
+@app.get("/api/health")
 async def health():
     return {
         "status": "ok",
         "mode": settings.MODE,
         "model": settings.LLM_MODEL,
+    }
+
+
+@app.get("/api/stats")
+async def stats():
+    """Dashboard stats — aggregates data from all services."""
+    from app.core.vector_store import get_vector_store
+
+    collections = []
+    try:
+        vs = get_vector_store()
+        collections = vs.list_collections()
+    except Exception:
+        pass
+
+    conversations = 0
+    try:
+        from app.routers.chat import service as chat_svc
+        convs = await chat_svc.list_conversations()
+        conversations = len(convs)
+    except Exception:
+        pass
+
+    schemas = 0
+    try:
+        from app.routers.text2sql import service as sql_svc
+        schema_list = await sql_svc.list_schemas()
+        schemas = len(schema_list)
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "mode": settings.MODE,
+        "model": settings.LLM_MODEL,
+        "collections": collections,
+        "conversations": conversations,
+        "schemas": schemas,
     }
 
 

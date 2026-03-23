@@ -34,6 +34,8 @@ def _build_db_url(
         return f"oracle+oracledb://{u}:{pw}@{h}:{p}/?service_name={n}"
     elif t == "postgresql":
         return f"postgresql://{u}:{pw}@{h}:{p}/{n}"
+    elif t == "mysql":
+        return f"mysql+pymysql://{u}:{pw}@{h}:{p}/{n}"
     elif t == "sqlite":
         return f"sqlite:///{n}"
     return None
@@ -77,15 +79,19 @@ class Text2SqlService:
         db_type: str, host: str, port: int, name: str, user: str, password: str
     ) -> dict:
         url = _build_db_url(db_type, host, port, name, user, password)
+        logger.info(f"Testing connection: {db_type}@{host}:{port}/{name} user={user}")
         if not url:
             return {"ok": False, "error": "Invalid connection parameters"}
         try:
             engine = create_engine(url, pool_pre_ping=True)
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1 FROM DUAL" if db_type == "oracle" else "SELECT 1"))
+            logger.info("DB connection test: OK")
             return {"ok": True}
         except Exception as e:
-            return {"ok": False, "error": str(e).split("\n")[0]}
+            error_msg = str(e).split("\n")[0]
+            logger.error(f"DB connection failed: {error_msg}")
+            return {"ok": False, "error": error_msg}
 
     # ── Schema auto-discovery ────────────────────────────
 

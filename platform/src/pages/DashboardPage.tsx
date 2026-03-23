@@ -5,7 +5,7 @@ import {
   Globe, GitBranch, Layers, Clock, CheckCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { healthApi, ragApi, chatApi, sqlApi } from "@/lib/api";
+import { healthApi, ragApi, chatApi, sqlApi, statsApi } from "@/lib/api";
 
 interface HealthInfo { status: string; mode: string; model: string; }
 interface Stat { label: string; value: string | number; icon: React.ElementType; color: string; }
@@ -27,12 +27,22 @@ export function DashboardPage() {
   const [loading, setLoading]         = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      healthApi.check().then(r => setHealth(r.data)).catch(() => {}),
-      ragApi.listCollections().then(r => setCollections(r.data)).catch(() => {}),
-      chatApi.listConversations().then(r => setConversations(r.data.length)).catch(() => {}),
-      sqlApi.listSchemas().then(r => setSchemaCount(r.data.length)).catch(() => {}),
-    ]).finally(() => setLoading(false));
+    statsApi.get()
+      .then(r => {
+        setHealth({ status: r.data.status, mode: r.data.mode, model: r.data.model });
+        setCollections(r.data.collections);
+        setConversations(r.data.conversations);
+        setSchemaCount(r.data.schemas);
+      })
+      .catch(() => {
+        Promise.all([
+          healthApi.check().then(r => setHealth(r.data)).catch(() => {}),
+          ragApi.listCollections().then(r => setCollections(r.data)).catch(() => {}),
+          chatApi.listConversations().then(r => setConversations(r.data.length)).catch(() => {}),
+          sqlApi.listSchemas().then(r => setSchemaCount(r.data.length)).catch(() => {}),
+        ]);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const totalChunks = collections.reduce((s, c) => s + c.count, 0);

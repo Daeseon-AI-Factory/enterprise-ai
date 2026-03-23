@@ -35,6 +35,9 @@ class ChatService:
             logger.warning(f"Failed to list collections: {e}")
             return [], ""
 
+        if not collections:
+            return [], ""
+
         for col in collections:
             col_name = col.get("name", col) if isinstance(col, dict) else str(col)
             try:
@@ -83,14 +86,14 @@ class ChatService:
         conv_id = conversation_id or str(uuid.uuid4())
         history = self._store.load(conv_id)
 
-        # Always search RAG first
+        # Search RAG if documents exist, otherwise pure chat
         sources, rag_context = self._search_all_collections(message)
 
         if rag_context:
             rag_block = f"\n## Retrieved Documents\n{rag_context}"
             system_prompt = SYSTEM_RAG_CHAT.format(rag_context=rag_block)
         else:
-            system_prompt = SYSTEM_RAG_CHAT.format(rag_context="\n(참고 가능한 문서 없음)")
+            system_prompt = SYSTEM_CHAT
 
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(history)
@@ -121,14 +124,14 @@ class ChatService:
         conv_id = conversation_id or str(uuid.uuid4())
         history = self._store.load(conv_id)
 
-        # Always search RAG first
+        # Search RAG if documents exist, otherwise pure chat
         sources, rag_context = self._search_all_collections(message)
 
         if rag_context:
             rag_block = f"\n## Retrieved Documents\n{rag_context}"
             system_prompt = SYSTEM_RAG_CHAT.format(rag_context=rag_block)
         else:
-            system_prompt = SYSTEM_RAG_CHAT.format(rag_context="\n(참고 가능한 문서 없음)")
+            system_prompt = SYSTEM_CHAT
 
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(history)

@@ -1,7 +1,9 @@
 import axios from "axios";
 
+const BASE_URL = import.meta.env.VITE_API_URL || "/api";
+
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -39,12 +41,16 @@ export const chatApi = {
       conversation_id: conversationId,
     }),
 
-  stream: (message: string, conversationId?: string) =>
-    fetch("/api/chat/stream", {
+  stream: (message: string, conversationId?: string) => {
+    const token = localStorage.getItem("auth_token");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(`${BASE_URL}/chat/stream`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ message, conversation_id: conversationId }),
-    }),
+    });
+  },
 
   listConversations: () =>
     api.get<Array<{ id: string; preview: string; message_count: number; modified: number }>>(
@@ -102,8 +108,8 @@ export const sqlApi = {
       schema_id: schemaId,
     }),
 
-  execute: (sql: string) =>
-    api.post("/text2sql/execute", { sql, confirmed: true }),
+  execute: (sql: string, connection?: Record<string, unknown>) =>
+    api.post("/text2sql/execute", { sql, confirmed: true, connection }),
 
   registerSchema: (schemaId: string, tables: unknown[], description?: string) =>
     api.post("/text2sql/schema", { schema_id: schemaId, tables, description }),
@@ -224,10 +230,21 @@ export const settingsApi = {
   list: () => api.get<{ keys: string[] }>("/settings"),
 };
 
-// Health — endpoint is at root /health, not under /api
+// Health
 export const healthApi = {
   check: () =>
-    axios.get<{ status: string; mode: string; model: string }>("/health"),
+    api.get<{ status: string; mode: string; model: string }>("/../health"),
+};
+
+// Stats (dashboard)
+export const statsApi = {
+  get: () =>
+    api.get<{
+      status: string; mode: string; model: string;
+      collections: Array<{ name: string; count: number }>;
+      conversations: number;
+      schemas: number;
+    }>("/stats"),
 };
 
 // Analyze (RAG + DB combined)

@@ -15,6 +15,7 @@ class SqlGenerateRequest(BaseModel):
 class SqlExecuteRequest(BaseModel):
     sql: str
     confirmed: bool = False
+    connection: dict | None = None
 
 
 class SchemaRegisterRequest(BaseModel):
@@ -48,7 +49,7 @@ async def execute_sql(req: SqlExecuteRequest):
     """Execute SELECT SQL (requires confirmed=true)."""
     if not req.confirmed:
         return {"error": "SQL execution requires user confirmation", "confirmed": False}
-    return await service.execute(sql=req.sql)
+    return await service.execute(sql=req.sql, connection=req.connection)
 
 
 @router.post("/connection/test")
