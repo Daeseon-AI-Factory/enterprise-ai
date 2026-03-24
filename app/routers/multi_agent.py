@@ -14,6 +14,8 @@ class AgentCreate(BaseModel):
     role: str
     system_prompt: str
     tools: list[str] = []
+    tables: list[str] = []          # SQL scope: empty = all tables
+    collections: list[str] = []     # RAG scope: empty = all collections
     domain: str = "COMMON"
     icon: str = "🤖"
 
@@ -24,6 +26,8 @@ class AgentUpdate(BaseModel):
     role: str | None = None
     system_prompt: str | None = None
     tools: list[str] | None = None
+    tables: list[str] | None = None
+    collections: list[str] | None = None
     domain: str | None = None
     icon: str | None = None
 

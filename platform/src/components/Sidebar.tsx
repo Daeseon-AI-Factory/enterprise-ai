@@ -12,7 +12,7 @@ const navItems = [
   { to: "/rag",       icon: FileText,        ko: "RAG 문서",     en: "RAG Docs" },
   { to: "/sql",       icon: Database,        ko: "텍스트→SQL",   en: "Text-to-SQL" },
   { to: "/ask",       icon: Bot,             ko: "업무 질의",    en: "Ask (Multi-Agent)" },
-  { to: "/analyze",   icon: Layers,          ko: "통합 진단",    en: "Analyze" },
+  { to: "/agents",   icon: Layers,          ko: "에이전트 관리", en: "Agent Manager" },
   { to: "/git",       icon: GitBranch,       ko: "Git 코드 RAG", en: "Git Code RAG" },
   { to: "/codegen",   icon: Code2,           ko: "코드 생성",    en: "Code Gen" },
   { to: "/confluence",icon: Globe,           ko: "Confluence",   en: "Confluence" },
