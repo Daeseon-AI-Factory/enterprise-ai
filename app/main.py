@@ -23,7 +23,7 @@ logger.add(
     encoding="utf-8",
 )
 from app.routers import (
-    auth, analyze, git_rag,
+    auth, analyze, git_rag, multi_agent,
     chat, rag, text2sql, codegen, confluence, review, build,
     settings as settings_router,
     agent, function_chat, finetune, webhook, scheduler, ocr, stt, vision,
@@ -61,6 +61,9 @@ app.include_router(confluence.router, prefix="/api/confluence", tags=["Confluenc
 app.include_router(review.router, prefix="/api/review", tags=["Review"])
 app.include_router(build.router, prefix="/api/build", tags=["Build"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["Settings"])
+
+# === Multi-Agent Orchestration ===
+app.include_router(multi_agent.router, prefix="/api", tags=["Multi-Agent"])
 
 # === Level 6: AI Agent ===
 app.include_router(agent.router, prefix="/api/agent", tags=["Agent"])

@@ -11,6 +11,7 @@ const navItems = [
   { to: "/chat",      icon: MessageSquare,   ko: "AI 채팅",      en: "AI Chat" },
   { to: "/rag",       icon: FileText,        ko: "RAG 문서",     en: "RAG Docs" },
   { to: "/sql",       icon: Database,        ko: "텍스트→SQL",   en: "Text-to-SQL" },
+  { to: "/ask",       icon: Bot,             ko: "업무 질의",    en: "Ask (Multi-Agent)" },
   { to: "/analyze",   icon: Layers,          ko: "통합 진단",    en: "Analyze" },
   { to: "/git",       icon: GitBranch,       ko: "Git 코드 RAG", en: "Git Code RAG" },
   { to: "/codegen",   icon: Code2,           ko: "코드 생성",    en: "Code Gen" },

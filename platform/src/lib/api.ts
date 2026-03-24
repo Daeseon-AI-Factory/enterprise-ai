@@ -263,6 +263,38 @@ export const analyzeApi = {
   }>("/analyze", params),
 };
 
+// Multi-Agent
+export const agentApi = {
+  list: () => api.get<Array<{
+    id: string; name: string; name_en: string; role: string;
+    tools: string[]; domain: string; icon: string;
+  }>>("/agents"),
+
+  get: (id: string) => api.get(`/agents/${id}`),
+
+  create: (agent: {
+    id: string; name: string; name_en?: string; role: string;
+    system_prompt: string; tools?: string[]; domain?: string; icon?: string;
+  }) => api.post("/agents", agent),
+
+  update: (id: string, updates: Record<string, unknown>) =>
+    api.put(`/agents/${id}`, updates),
+
+  delete: (id: string) => api.delete(`/agents/${id}`),
+
+  ask: (question: string, agentIds?: string[]) =>
+    api.post<{
+      question: string;
+      agents_used: string[];
+      results: Array<{
+        agent_id: string; agent_name: string; icon: string;
+        answer: string; tools_used: string[]; elapsed: number;
+      }>;
+      final_answer: string;
+      elapsed: number;
+    }>("/ask", { question, agent_ids: agentIds }),
+};
+
 // Git RAG
 export const gitApi = {
   indexRepo: (params: { repo_path: string; repo_url?: string; collection?: string }) =>

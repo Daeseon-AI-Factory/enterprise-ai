@@ -7,6 +7,7 @@ import { ChatPage } from "@/pages/ChatPage";
 import { RagPage } from "@/pages/RagPage";
 import { SqlPage } from "@/pages/SqlPage";
 import { AnalyzePage } from "@/pages/AnalyzePage";
+import { AskPage } from "@/pages/AskPage";
 import { GitPage } from "@/pages/GitPage";
 import { CodegenPage } from "@/pages/CodegenPage";
 import { ConfluencePage } from "@/pages/ConfluencePage";
@@ -48,6 +49,7 @@ export function App() {
         <Route path="/rag" element={<RagPage />} />
         <Route path="/sql" element={<SqlPage />} />
         <Route path="/analyze" element={<AnalyzePage />} />
+        <Route path="/ask" element={<AskPage />} />
         <Route path="/git" element={<GitPage />} />
         <Route path="/codegen" element={<CodegenPage />} />
         <Route path="/confluence" element={<ConfluencePage />} />
