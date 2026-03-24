@@ -213,5 +213,118 @@ This document records every major decision, bug fix, and architectural improveme
 
 ---
 
+## 6. Multi-Agent Orchestration (2026-03-24)
+
+### 6.1 Multi-Agent System — Zero External Dependencies
+- **Motivation**: Enable domain-specific agents to collaborate on complex business queries
+- **Architecture**: Orchestrator → Agent selection → Sequential execution with context passing
+- **Key Decision**: No AutoGen/CrewAI/LangGraph. Built from scratch in 200 lines.
+  - Same LLM (OSS-120B or GPT-4o-mini), different system prompts per agent
+  - Tools: SQL, RAG (scoped to agent's allowed tables/collections)
+- **Default Agents**:
+  - 🔍 Quality Analyst: MES tables only (DEFECTS, PRODUCTION_ORDERS, etc.)
+  - 📄 Document Searcher: RAG across all collections
+  - 📦 Inventory Manager: WMS tables only (INVENTORY, INBOUND, OUTBOUND, etc.)
+  - 📝 Report Writer: Synthesizes other agents' results
+- **Files**: `app/services/multi_agent_service.py`, `app/routers/multi_agent.py`
+
+### 6.2 Scoped Agent Execution — Table & Collection Restrictions
+- **Problem**: Agents searching all 11 tables / all 7 collections → LLM confused, inaccurate
+- **Solution**: Each agent has `tables[]` and `collections[]` fields
+  - SQL tool: Only sends allowed table schemas to LLM → narrower context → better SQL
+  - RAG tool: Only searches allowed collections → more relevant documents
+- **Example**:
+  ```
+  Quality Analyst: tables=["DEFECTS","PRODUCTION_ORDERS","PRODUCTION_LINES"]
+                   collections=["confluence_mes"]
+  → LLM only sees 3 tables instead of 11 → generates precise SQL
+  ```
+- **UI**: Agent Manager page with table/collection picker (toggle buttons)
+
+### 6.3 Agent Manager Page (/agents)
+- **Features**: Create, edit, delete agents
+- **Configurable fields**: name, domain, icon, system prompt, tools, tables, collections
+- **UI shows**: Available tables from registered schemas, available collections from ChromaDB
+
+### 6.4 Business Query Page (/ask) — Replaces Unified Analysis
+- **Before**: /analyze page did RAG + SQL but no agent orchestration
+- **After**: /ask page with multi-agent orchestration
+  - Auto mode: AI selects which agents to involve
+  - Manual mode: User picks specific agents
+  - Execution timeline: Shows each agent's work, elapsed time, scope
+  - Final answer: Last agent's synthesized output
+
+---
+
+## 7. UI/UX Improvements (2026-03-24)
+
+### 7.1 Session State Persistence
+- **Problem**: Navigating between pages resets all input/results
+- **Root Cause**: React component unmount destroys state
+- **Solution**: `sessionStorage` save/restore for key state variables
+- **Applied**: AskPage (question, result, agent selection), SqlPage (question, SQL, results, history), RagPage (already had it)
+- **Pattern**:
+  ```typescript
+  const [question, setQuestion] = useState(() => loadSession("question", ""));
+  useEffect(() => { saveSession("question", question); }, [question]);
+  ```
+
+### 7.2 Pure Chat Mode — RAG Removed from /chat
+- **Problem**: Chat page froze 10+ seconds on first message (embedding model loading)
+- **Root Cause**: `_search_all_collections()` called on every chat message, triggering 4.3GB model load
+- **Solution**: Chat is now pure LLM. RAG is only in /ask (multi-agent) and /rag (dedicated)
+- **Result**: Chat response: 10+ sec → 2 sec
+
+### 7.3 Conversation Compression
+- **Problem**: Long conversations exceed LLM token limit
+- **Solution**: Hybrid compression
+  - Messages ≤ 16: send all verbatim
+  - Messages > 16: summarize old messages + keep last 10 verbatim
+  - Summary cached per conversation
+- **Config**: `RECENT_MSG_COUNT=10`, `SUMMARY_THRESHOLD=16`
+
+### 7.4 Frontend Message Windowing
+- **Problem**: 500+ messages in DOM causes browser lag
+- **Solution**: Render last 30 messages only. "Load older" button adds 30 more.
+- **No external library**: Pure React state management
+
+### 7.5 Configurable API Base URL
+- **Problem**: Vite proxy didn't work on VDI
+- **Solution**: `VITE_API_URL` env var. Set `http://localhost:8080/api` for direct connection.
+- **Streaming fix**: `chatApi.stream()` now uses configurable base URL + auth token
+
+### 7.6 Dashboard Stats API
+- **Problem**: Dashboard made 4 separate API calls, some failed silently
+- **Solution**: Single `/api/stats` endpoint with graceful fallback
+
+---
+
+## 8. Structured Logging System (2026-03-24)
+
+### Log Tags
+| Tag | Service | Example |
+|-----|---------|---------|
+| `[CHAT]` | ChatService | `[CHAT] 질문: 'hello' (conv: db1d, 히스토리: 0→0개)` |
+| `[CHAT]` | ChatService | `[CHAT] LLM 응답: 34자 (2.0초)` |
+| `[SQL]` | Text2SqlService | `[SQL] 질문: 'defect rate' (스키마: mes_oracle)` |
+| `[SQL]` | Text2SqlService | `[SQL] 실행 완료: 5행 반환 (0.08초)` |
+| `[RAG]` | RagService | `[RAG] 질의 시작: '생산 불량' (컬렉션: all)` |
+| `[UPLOAD]` | RagService | `[UPLOAD] 파일 수신: report.pdf (2.3MB)` |
+| `[UPLOAD]` | RagService | `[UPLOAD] 임베딩 + 저장 완료 → 총 3.2초` |
+| `[AGENT]` | MultiAgentService | `[AGENT] 실행 시작: quality_analyst | 테이블: [DEFECTS...]` |
+| `[AGENT-TOOL]` | MultiAgentService | `[AGENT-TOOL] quality_analyst SQL 생성: SELECT...` |
+| `[AGENT-TOOL]` | MultiAgentService | `[AGENT-TOOL] quality_analyst SQL 실행 에러: ORA-00942` |
+| `[AGENT-MGMT]` | MultiAgentService | `[AGENT-MGMT] 생성: line_monitor (라인 모니터)` |
+| `[ORCHESTRATOR]` | MultiAgentService | `[ORCHESTRATOR] 자동 선택: ['quality_analyst', 'report_writer']` |
+| `[ORCHESTRATOR]` | MultiAgentService | `[ORCHESTRATOR] 완료: 2개 에이전트, 총 22.7초` |
+
+### Error Logging Principles
+- API 200 OK but business error → `logger.error("[TAG] 비즈니스 에러: {msg}")`
+- API 200 OK + success → `logger.info("[TAG] 완료: {detail}")`
+- Exception caught → `logger.error("[TAG] 예외: {e}")` with full context
+- All timing measured: `t0 = time.time()` → `elapsed = time.time() - t0`
+
+---
+
 *Last updated: 2026-03-24*
 *Author: Jason (JasonAIFactory)*
