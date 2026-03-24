@@ -1,8 +1,10 @@
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from loguru import logger
 
 from app.config import settings
@@ -193,6 +195,22 @@ async def startup():
         except Exception as e:
             logger.warning(f"Embedding warmup failed (non-critical): {e}")
     asyncio.create_task(_warmup())
+
+
+# === Serve frontend static files (production mode) ===
+DIST_DIR = Path(__file__).resolve().parent.parent / "platform" / "dist"
+if DIST_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="static")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(request: Request, full_path: str):
+        """Serve React SPA — all non-API routes return index.html."""
+        file_path = DIST_DIR / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(DIST_DIR / "index.html"))
+
+    logger.info(f"Serving frontend from {DIST_DIR}")
 
 
 @app.on_event("shutdown")

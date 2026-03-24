@@ -11,14 +11,14 @@ import ReactMarkdown from "react-markdown";
 
 interface Agent {
   id: string; name: string; icon: string;
-  tools: string[]; tables: string[]; collections: string[];
-  domain: string;
+  tools: string[]; tables?: string[]; collections?: string[];
+  domain: string; name_en?: string; role?: string;
 }
 
 interface AgentResult {
   agent_id: string; agent_name: string; icon: string;
   answer: string; tools_used: string[];
-  tables_scope: string[]; collections_scope: string[];
+  tables_scope?: string[]; collections_scope?: string[];
   elapsed: number;
 }
 

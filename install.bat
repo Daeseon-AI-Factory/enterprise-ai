@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul
+cd /d "%~dp0"
 echo ============================================
 echo  Enterprise LLM Platform - 자동 설치
 echo ============================================
@@ -38,7 +39,7 @@ echo  설치 완료!
 echo ============================================
 echo.
 echo 실행 방법:
-echo   python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+echo   start.bat 더블클릭
 echo.
 echo 접속: http://localhost:8080
 echo 로그인: admin / changeme123!

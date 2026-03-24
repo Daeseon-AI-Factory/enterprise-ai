@@ -8,12 +8,12 @@ import { Plus, Trash2, Save, X } from "lucide-react";
 interface Agent {
   id: string;
   name: string;
-  name_en: string;
-  role: string;
-  system_prompt: string;
+  name_en?: string;
+  role?: string;
+  system_prompt?: string;
   tools: string[];
-  tables: string[];
-  collections: string[];
+  tables?: string[];
+  collections?: string[];
   domain: string;
   icon: string;
 }
@@ -22,7 +22,11 @@ export function AgentManagerPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [editAgent, setEditAgent] = useState<Agent | null>(null);
   const [isNew, setIsNew] = useState(false);
-  const [availableTables, setAvailableTables] = useState<string[]>([]);
+  const [availableTables] = useState<string[]>([
+    "PRODUCTION_LINES", "PRODUCTS", "PRODUCTION_ORDERS",
+    "WORK_RESULTS", "DEFECTS", "EQUIPMENT",
+    "WAREHOUSES", "ITEMS", "INVENTORY", "INBOUND", "OUTBOUND",
+  ]);
   const [availableCollections, setAvailableCollections] = useState<string[]>([]);
 
   useEffect(() => {
@@ -43,9 +47,9 @@ export function AgentManagerPage() {
   const handleSave = async (agent: Agent) => {
     try {
       if (isNew) {
-        await agentApi.create(agent);
+        await agentApi.create(agent as any);
       } else {
-        await agentApi.update(agent.id, agent);
+        await agentApi.update(agent.id, agent as any);
       }
       const res = await agentApi.list();
       setAgents(res.data);
@@ -172,9 +176,9 @@ export function AgentManagerPage() {
                     "WAREHOUSES", "ITEMS", "INVENTORY", "INBOUND", "OUTBOUND",
                   ]).map(table => (
                     <button key={table}
-                      onClick={() => setEditAgent({ ...editAgent, tables: toggleItem(editAgent.tables, table) })}
+                      onClick={() => setEditAgent({ ...editAgent, tables: toggleItem(editAgent.tables || [], table) })}
                       className={`px-2 py-1 rounded text-xs border ${
-                        editAgent.tables.includes(table)
+                        (editAgent.tables || []).includes(table)
                           ? "bg-amber-600 text-white border-amber-600"
                           : "bg-muted border-border"
                       }`}>
@@ -194,9 +198,9 @@ export function AgentManagerPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {availableCollections.map(col => (
                     <button key={col}
-                      onClick={() => setEditAgent({ ...editAgent, collections: toggleItem(editAgent.collections, col) })}
+                      onClick={() => setEditAgent({ ...editAgent, collections: toggleItem(editAgent.collections || [], col) })}
                       className={`px-2 py-1 rounded text-xs border ${
-                        editAgent.collections.includes(col)
+                        (editAgent.collections || []).includes(col)
                           ? "bg-emerald-600 text-white border-emerald-600"
                           : "bg-muted border-border"
                       }`}>

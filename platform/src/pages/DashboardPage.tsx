@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  MessageSquare, FileText, Database, Code2, Activity,
+  MessageSquare, FileText, Database, Activity,
   Globe, GitBranch, Layers, Clock, CheckCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

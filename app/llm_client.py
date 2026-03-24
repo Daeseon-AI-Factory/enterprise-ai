@@ -1,3 +1,4 @@
+import httpx
 from openai import OpenAI
 from loguru import logger
 
@@ -6,6 +7,7 @@ from app.config import settings
 client = OpenAI(
     base_url=settings.LLM_API_BASE,
     api_key=settings.LLM_API_KEY,
+    timeout=httpx.Timeout(300.0, connect=10.0),  # 5min timeout for large models
 )
 
 
