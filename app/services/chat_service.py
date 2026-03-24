@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from typing import AsyncGenerator
 
@@ -21,10 +22,53 @@ SYSTEM_RAG_CHAT = """You are an enterprise AI assistant with access to a knowled
 {rag_context}"""
 
 
+RECENT_MSG_COUNT = 10  # Keep last N messages verbatim
+SUMMARY_THRESHOLD = 16  # Summarize when history exceeds this
+
+
 class ChatService:
     def __init__(self):
         self._store = ConversationStore()
         self._vector_store = get_vector_store()
+        self._summaries: dict[str, str] = {}  # conv_id → summary
+
+    def _compress_history(self, conv_id: str, history: list[dict]) -> list[dict]:
+        """Compress long conversations: summary of old + recent messages verbatim."""
+        if len(history) <= SUMMARY_THRESHOLD:
+            return history
+
+        old_messages = history[:-RECENT_MSG_COUNT]
+        recent_messages = history[-RECENT_MSG_COUNT:]
+
+        # Check if we already have a summary for this conversation
+        existing_summary = self._summaries.get(conv_id, "")
+
+        # Build summary from old messages
+        old_text = "\n".join(
+            f"{'User' if m['role'] == 'user' else 'AI'}: {m['content'][:200]}"
+            for m in old_messages[-20:]  # Summarize last 20 old messages max
+        )
+
+        try:
+            summary_response = chat_completion(
+                messages=[
+                    {"role": "system", "content": "Summarize the following conversation in 2-3 sentences. Preserve key facts, decisions, and context. Write in the same language as the conversation."},
+                    {"role": "user", "content": f"Previous summary: {existing_summary}\n\nNew messages:\n{old_text}"},
+                ],
+                temperature=0.1,
+            )
+            summary = summary_response.choices[0].message.content or ""
+            self._summaries[conv_id] = summary
+            logger.info(f"Compressed {len(old_messages)} old messages into summary for [{conv_id[:8]}]")
+        except Exception as e:
+            logger.warning(f"Summary generation failed: {e}")
+            summary = existing_summary or ""
+
+        if summary:
+            compressed = [{"role": "system", "content": f"[Previous conversation summary]\n{summary}"}]
+            compressed.extend(recent_messages)
+            return compressed
+        return recent_messages
 
     def _search_all_collections(self, query: str, top_k: int = 5) -> tuple[list[dict], str]:
         """Search across all RAG collections and build context."""
@@ -83,38 +127,39 @@ class ChatService:
         message: str,
         conversation_id: str | None = None,
     ) -> dict:
+        t0 = time.time()
         conv_id = conversation_id or str(uuid.uuid4())
         history = self._store.load(conv_id)
+        raw_count = len(history)
 
-        # Search RAG if documents exist, otherwise pure chat
-        sources, rag_context = self._search_all_collections(message)
+        # Compress long conversations: summary + recent messages
+        history = self._compress_history(conv_id, history)
+        logger.info(f"[CHAT] 질문: '{message[:60]}' (conv: {conv_id[:8]}, 히스토리: {raw_count}→{len(history)}개)")
 
-        if rag_context:
-            rag_block = f"\n## Retrieved Documents\n{rag_context}"
-            system_prompt = SYSTEM_RAG_CHAT.format(rag_context=rag_block)
-        else:
-            system_prompt = SYSTEM_CHAT
+        # Pure chat — no RAG search (RAG is handled by /ask or /analyze)
+        system_prompt = SYSTEM_CHAT
 
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(history)
         messages.append({"role": "user", "content": message})
+        total_chars = sum(len(m.get("content", "")) for m in messages)
+        logger.info(f"[CHAT] LLM 호출: 메시지 {len(messages)}개, 약 {total_chars}자")
 
         try:
+            t1 = time.time()
             response = chat_completion(messages=messages)
             reply = response.choices[0].message.content or ""
+            logger.info(f"[CHAT] LLM 응답: {len(reply)}자 ({time.time()-t1:.1f}초)")
         except Exception as e:
-            logger.error(f"LLM call failed: {e}")
+            logger.error(f"[CHAT] LLM 호출 실패: {e}")
             return {"reply": f"LLM 호출 실패: {e}", "conversation_id": conv_id}
 
         # Persist
         self._store.append(conv_id, {"role": "user", "content": message})
         self._store.append(conv_id, {"role": "assistant", "content": reply})
 
-        logger.info(f"Chat [{conv_id[:8]}]: {message[:50]}... (RAG sources: {len(sources)})")
-        result = {"reply": reply, "conversation_id": conv_id}
-        if sources:
-            result["sources"] = sources
-        return result
+        logger.info(f"[CHAT] 완료: 총 {time.time()-t0:.1f}초")
+        return {"reply": reply, "conversation_id": conv_id}
 
     async def chat_stream(
         self,
@@ -124,27 +169,21 @@ class ChatService:
         conv_id = conversation_id or str(uuid.uuid4())
         history = self._store.load(conv_id)
 
-        # Search RAG if documents exist, otherwise pure chat
-        sources, rag_context = self._search_all_collections(message)
+        # Compress long conversations: summary + recent messages
+        history = self._compress_history(conv_id, history)
+        logger.info(f"[CHAT-STREAM] 질문: '{message[:60]}' (conv: {conv_id[:8]})")
 
-        if rag_context:
-            rag_block = f"\n## Retrieved Documents\n{rag_context}"
-            system_prompt = SYSTEM_RAG_CHAT.format(rag_context=rag_block)
-        else:
-            system_prompt = SYSTEM_CHAT
+        # Pure chat — no RAG search
+        system_prompt = SYSTEM_CHAT
 
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(history)
         messages.append({"role": "user", "content": message})
 
-        # Send sources info first
-        if sources:
-            yield f"data: {json.dumps({'sources': sources, 'conversation_id': conv_id}, ensure_ascii=False)}\n\n"
-
         try:
             stream = chat_completion(messages=messages, stream=True)
         except Exception as e:
-            logger.error(f"LLM stream failed: {e}")
+            logger.error(f"[CHAT-STREAM] LLM 호출 실패: {e}")
             yield f"data: {json.dumps({'error': str(e), 'conversation_id': conv_id})}\n\n"
             return
 

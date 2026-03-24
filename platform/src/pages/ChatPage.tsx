@@ -2,8 +2,10 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { chatApi } from "@/lib/api";
-import { MessageSquare, Plus, Trash2, Loader2 } from "lucide-react";
+import { MessageSquare, Plus, Trash2, Loader2, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const VISIBLE_BATCH = 30; // Render this many messages at a time
 
 interface Message {
   role: "user" | "assistant";
@@ -25,6 +27,7 @@ export function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(VISIBLE_BATCH);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // 대화 목록 불러오기
@@ -60,6 +63,7 @@ export function ChatPage() {
   const handleNew = () => {
     setActiveId(undefined);
     setMessages([]);
+    setVisibleCount(VISIBLE_BATCH);
     localStorage.removeItem("chat_active_id");
   };
 
@@ -194,14 +198,27 @@ export function ChatPage() {
               </div>
               <h2 className="text-xl font-semibold mb-2">AI Chat</h2>
               <p className="text-muted-foreground max-w-md">
-                무엇이든 물어보세요. 업로드된 문서를 기반으로 답변하며,
-                일반 질문도 도와드립니다.
+                무엇이든 물어보세요. 문서가 업로드되어 있으면 자동으로 참고하며,
+                일반 질문에도 답변합니다.
               </p>
             </div>
           ) : (
             <div className="mx-auto max-w-3xl">
-              {messages.map((msg, i) => (
-                <ChatMessage key={i} role={msg.role} content={msg.content} />
+              {messages.length > visibleCount && (
+                <div className="flex justify-center py-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs gap-1"
+                    onClick={() => setVisibleCount(v => v + VISIBLE_BATCH)}
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                    이전 메시지 더 보기 ({messages.length - visibleCount}개)
+                  </Button>
+                </div>
+              )}
+              {messages.slice(-visibleCount).map((msg, i) => (
+                <ChatMessage key={messages.length - visibleCount + i} role={msg.role} content={msg.content} />
               ))}
               {loading && messages[messages.length - 1]?.role === "user" && (
                 <div className="flex gap-4 px-4 py-6 bg-muted/50">

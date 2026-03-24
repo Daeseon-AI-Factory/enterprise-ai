@@ -21,6 +21,12 @@ class RagService:
         collection: str = "default",
     ) -> dict:
         """Upload document, chunk it, embed, and store in vector DB."""
+        import time
+        t0 = time.time()
+        file_size = f"{len(await file.read()) / 1024:.1f}KB"
+        await file.seek(0)  # reset after reading size
+        logger.info(f"[UPLOAD] 파일 수신: {file.filename} ({file_size}) → 컬렉션 '{collection}'")
+
         # Save uploaded file
         upload_dir = "uploads"
         os.makedirs(upload_dir, exist_ok=True)
@@ -29,19 +35,31 @@ class RagService:
         content = await file.read()
         with open(file_path, "wb") as f:
             f.write(content)
+        logger.info(f"[UPLOAD] 파일 저장 완료: {file_path}")
 
         # Load and chunk document
-        chunks = self._doc_loader.load_and_chunk(file_path, file.filename)
-        logger.info(f"Loaded {len(chunks)} chunks from {file.filename}")
+        try:
+            chunks = self._doc_loader.load_and_chunk(file_path, file.filename)
+            avg_len = sum(len(c) for c in chunks) // max(len(chunks), 1)
+            logger.info(f"[UPLOAD] 텍스트 추출 + 청킹 완료: {len(chunks)}개 청크 (평균 {avg_len}자)")
+        except Exception as e:
+            logger.error(f"[UPLOAD] 텍스트 추출 실패: {file.filename} → {e}")
+            return {"status": "error", "error": str(e)}
 
         # Store in vector DB
         doc_id = str(uuid.uuid4())
-        self._vector_store.add_documents(
-            collection=collection,
-            documents=chunks,
-            doc_id=doc_id,
-            filename=file.filename,
-        )
+        try:
+            self._vector_store.add_documents(
+                collection=collection,
+                documents=chunks,
+                doc_id=doc_id,
+                filename=file.filename,
+            )
+            elapsed = time.time() - t0
+            logger.info(f"[UPLOAD] 임베딩 + 저장 완료 → 컬렉션 '{collection}' | 총 {elapsed:.1f}초")
+        except Exception as e:
+            logger.error(f"[UPLOAD] 임베딩/저장 실패: {e}")
+            return {"status": "error", "error": str(e)}
 
         return {
             "status": "indexed",
@@ -58,6 +76,10 @@ class RagService:
         top_k: int = 5,
     ) -> dict:
         """Query documents using RAG pipeline. collection='all' searches every collection."""
+        import time
+        t0 = time.time()
+        logger.info(f"[RAG] 질의 시작: '{query[:80]}' (컬렉션: {collection}, top_k: {top_k})")
+
         if not self._vector_store.embedding_available:
             return {
                 "answer": "임베딩 모델이 설치되지 않았습니다. models/embedding/ 폴더에 모델을 복사해주세요.",
@@ -118,10 +140,12 @@ class RagService:
             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"},
         ]
         try:
+            t1 = time.time()
             response = chat_completion(messages=messages)
             answer = response.choices[0].message.content or ""
+            logger.info(f"[RAG] LLM 응답 완료: {len(answer)}자 ({time.time()-t1:.1f}초) | 총 {time.time()-t0:.1f}초")
         except Exception as e:
-            logger.error(f"RAG LLM call failed: {e}")
+            logger.error(f"[RAG] LLM 호출 실패: {e}")
             answer = f"LLM 호출 실패: {e}"
 
         return {"answer": answer, "sources": sources}

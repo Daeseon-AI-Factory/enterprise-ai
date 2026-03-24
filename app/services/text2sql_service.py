@@ -150,14 +150,21 @@ class Text2SqlService:
     # ── Generate SQL ─────────────────────────────────────
 
     async def generate(self, question: str, schema_id: str | None = None) -> dict:
+        import time
+        t0 = time.time()
         # 항상 파일에서 최신 스키마 로드 (다른 인스턴스가 저장했을 수 있음)
         self._schemas = self._load_schemas()
         schema_context = ""
+        used_schema = None
         if schema_id and schema_id in self._schemas:
             schema_context = self._format_schema(self._schemas[schema_id])
+            used_schema = schema_id
         elif self._schemas:
             first_key = next(iter(self._schemas))
             schema_context = self._format_schema(self._schemas[first_key])
+            used_schema = first_key
+
+        logger.info(f"[SQL] 질문: '{question[:80]}' (스키마: {used_schema})")
 
         messages = [
             {"role": "system", "content": SYSTEM_TEXT2SQL},
@@ -165,36 +172,50 @@ class Text2SqlService:
         ]
 
         try:
+            t1 = time.time()
             response = chat_completion(messages=messages, temperature=0.1)
             content = response.choices[0].message.content or ""
+            logger.info(f"[SQL] LLM 응답: {time.time()-t1:.1f}초")
         except Exception as e:
-            logger.error(f"Text2SQL LLM call failed: {e}")
+            logger.error(f"[SQL] LLM 호출 실패: {e}")
             return {"sql": "", "explanation": f"LLM 호출 실패: {e}"}
 
         sql, explanation = self._parse_response(content)
 
         if not self._is_safe_sql(sql):
+            logger.warning(f"[SQL] 안전하지 않은 SQL 차단: {sql[:80]}")
             return {"sql": "", "explanation": "ERROR: Only SELECT queries are allowed."}
 
-        logger.info(f"Text2SQL: {question[:50]} → {sql[:80]}")
+        logger.info(f"[SQL] 생성 완료: {sql[:100]} ({time.time()-t0:.1f}초)")
         return {"sql": sql, "explanation": explanation}
 
     # ── Execute SQL ──────────────────────────────────────
 
     async def execute(self, sql: str, connection: dict | None = None) -> dict:
+        import time
+        t0 = time.time()
+        logger.info(f"[SQL] 실행 요청: {sql[:100]}")
+
         if not self._is_safe_sql(sql):
+            logger.warning(f"[SQL] 차단됨: SELECT가 아닌 쿼리")
             return {"error": "Only SELECT queries are allowed", "rows": [], "columns": []}
 
         engine = self._engine
         if connection:
+            conn_info = f"{connection.get('db_type')}@{connection.get('host')}:{connection.get('port')}"
+            logger.info(f"[SQL] 외부 DB 연결: {conn_info}")
             url = _build_db_url(**connection)
             if url:
                 try:
                     engine = create_engine(url, pool_pre_ping=True)
                 except Exception as e:
+                    logger.error(f"[SQL] DB 연결 실패: {e}")
                     return {"error": str(e), "rows": [], "columns": []}
 
-        return self._run_query(engine, sql)
+        result = self._run_query(engine, sql)
+        row_count = result.get("row_count", len(result.get("rows", [])))
+        logger.info(f"[SQL] 실행 완료: {row_count}행 반환 ({time.time()-t0:.1f}초)")
+        return result
 
     def _run_query(self, engine, sql: str) -> dict:
         if engine is None:
