@@ -30,17 +30,32 @@ interface SqlHistoryEntry {
   columns: string[]; rows: Record<string, unknown>[]; timestamp: string;
 }
 
+function loadSql<T>(key: string, fallback: T): T {
+  try { const v = sessionStorage.getItem(`sql_${key}`); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+}
+
 export function SqlPage() {
   // ── Query tab ──
-  const [question, setQuestion] = useState("");
-  const [schemaId, setSchemaId] = useState("");
-  const [sql, setSql] = useState("");
-  const [explanation, setExplanation] = useState("");
-  const [columns, setColumns] = useState<string[]>([]);
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [question, setQuestion] = useState(() => loadSql("question", ""));
+  const [schemaId, setSchemaId] = useState(() => loadSql("schemaId", ""));
+  const [sql, setSql] = useState(() => loadSql("sql", ""));
+  const [explanation, setExplanation] = useState(() => loadSql("explanation", ""));
+  const [columns, setColumns] = useState<string[]>(() => loadSql("columns", []));
+  const [rows, setRows] = useState<Record<string, unknown>[]>(() => loadSql("rows", []));
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
-  const [sqlHistory, setSqlHistory] = useState<SqlHistoryEntry[]>([]);
+  const [sqlHistory, setSqlHistory] = useState<SqlHistoryEntry[]>(() => loadSql("history", []));
+
+  // Persist query state
+  useEffect(() => {
+    sessionStorage.setItem("sql_question", JSON.stringify(question));
+    sessionStorage.setItem("sql_schemaId", JSON.stringify(schemaId));
+    sessionStorage.setItem("sql_sql", JSON.stringify(sql));
+    sessionStorage.setItem("sql_explanation", JSON.stringify(explanation));
+    sessionStorage.setItem("sql_columns", JSON.stringify(columns));
+    sessionStorage.setItem("sql_rows", JSON.stringify(rows));
+    sessionStorage.setItem("sql_history", JSON.stringify(sqlHistory));
+  }, [question, schemaId, sql, explanation, columns, rows, sqlHistory]);
 
   // ── Schema tab ──
   const [schemas, setSchemas] = useState<Schema[]>([]);

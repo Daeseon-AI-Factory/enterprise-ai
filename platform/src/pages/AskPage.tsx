@@ -27,14 +27,35 @@ interface OrchestrateResult {
   results: AgentResult[]; final_answer: string; elapsed: number;
 }
 
+function loadSession<T>(key: string, fallback: T): T {
+  try {
+    const v = sessionStorage.getItem(`ask_${key}`);
+    return v ? JSON.parse(v) : fallback;
+  } catch { return fallback; }
+}
+function saveSession(key: string, value: unknown) {
+  sessionStorage.setItem(`ask_${key}`, JSON.stringify(value));
+}
+
 export function AskPage() {
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState(() => loadSession("question", ""));
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<OrchestrateResult | null>(null);
+  const [result, setResult] = useState<OrchestrateResult | null>(() => loadSession("result", null));
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
-  const [autoMode, setAutoMode] = useState(true);
-  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
+  const [selectedAgents, setSelectedAgents] = useState<string[]>(() => loadSession("selectedAgents", []));
+  const [autoMode, setAutoMode] = useState(() => loadSession("autoMode", true));
+  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(
+    () => new Set(loadSession<string[]>("expandedAgents", []))
+  );
+
+  // Persist state on change
+  useEffect(() => {
+    saveSession("question", question);
+    saveSession("result", result);
+    saveSession("selectedAgents", selectedAgents);
+    saveSession("autoMode", autoMode);
+    saveSession("expandedAgents", Array.from(expandedAgents));
+  }, [question, result, selectedAgents, autoMode, expandedAgents]);
 
   useEffect(() => {
     agentApi.list().then(r => setAgents(r.data)).catch(() => {});
