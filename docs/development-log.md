@@ -326,5 +326,125 @@ This document records every major decision, bug fix, and architectural improveme
 
 ---
 
-*Last updated: 2026-03-24*
+## 9. RAG Quality Engineering (2026-03-25)
+
+### 9.1 Problem: RAG Search Quality Degrades with More Documents
+
+- **Symptom**: After syncing Confluence space (hundreds of pages), RAG answers became irrelevant
+- **Root Cause**: Searching "all" collections at once mixes unrelated documents
+  ```
+  Query: "A라인 납땜불량 원인"
+  Results:
+    1. [confluence_mes] 생산 지시 처리 프로세스  ← 관련
+    2. [test] Jake's Cover Letter Template       ← 완전 무관
+    3. [confluence_dev] 온보딩 가이드             ← 무관
+  → LLM gets confused by noise, gives poor answer
+  ```
+- **Key Learning**: RAG is NOT "throw all documents in and search". Scoping is critical.
+
+### 9.2 Solution: Scoped Search via Multi-Agent Architecture
+
+Instead of one agent searching everything, **each agent searches its own domain**:
+
+```
+Before (single agent, all documents):
+  "A라인 불량 원인?" → searches 7 collections, 1500+ chunks
+  → noisy results, inaccurate answer
+
+After (multi-agent, scoped):
+  Quality Analyst → confluence_mes only (3 docs)
+  Inventory Manager → confluence_wms only (3 docs)
+  Report Writer → synthesizes focused results
+  → precise, relevant answers
+```
+
+### 9.3 Why This Matters (Interview-Ready Explanation)
+
+```
+Interviewer: "How do you maintain RAG accuracy as document count grows?"
+
+Answer: "We use a multi-agent architecture where each agent has a scoped
+search space. Instead of one agent searching all 7 collections with 1500+
+chunks, the quality analyst only searches confluence_mes (3 relevant docs),
+and the inventory manager only searches confluence_wms.
+
+This reduces noise dramatically. The LLM receives only relevant context,
+so SQL generation and answers are more accurate.
+
+We also use a three-stage retrieval pipeline:
+1. Dense embedding search (BGE-M3, multilingual)
+2. BM25 keyword matching (exact terms)
+3. Cross-encoder reranking (precision boost)
+
+The combination of scoped search + hybrid retrieval gives us production-grade
+accuracy even with thousands of documents."
+```
+
+### 9.4 RAG Quality Improvement Techniques (Ordered by Impact)
+
+| Technique | Impact | Implemented |
+|-----------|--------|-------------|
+| **Agent-scoped collections** | High | ✅ Yes |
+| **Hybrid search (Dense + BM25)** | High | ✅ Yes |
+| **Cross-encoder reranking** | High | ✅ Yes |
+| **Semantic chunking** | Medium | ✅ Yes |
+| **Metadata filtering** (date, domain) | Medium | Planned |
+| **Query expansion** (rephrase query) | Medium | Planned |
+| **User feedback loop** (thumbs up/down) | Low-Medium | Planned |
+| **Fine-tuned embedding model** | Low (BGE-M3 already good) | Not needed |
+
+### 9.5 Confluence Integration Learnings
+
+- **Authentication**: Confluence Server uses Basic Auth (ID + password), NOT API tokens
+- **API Token location varies**: Cloud = id.atlassian.com, Server = profile settings (may not exist)
+- **Space sync blocks backend**: Embedding large spaces (100+ pages) blocks all other requests
+  - **Fix needed**: Background worker for sync (async task queue)
+- **HTML to Text**: BeautifulSoup `get_text()` strips all HTML. Tables become flat text.
+  - **Improvement needed**: HTML table → Markdown table conversion for better LLM understanding
+
+### 9.6 LLM Timeout for Large Models
+
+- **Symptom**: RAG queries hang for 1+ minutes with no response
+- **Root Cause**: OpenAI client default timeout (60s) too short for OSS-120B model
+- **Fix**: Set explicit timeout `httpx.Timeout(300.0, connect=10.0)` — 5 minute response timeout
+- **File**: `app/llm_client.py`
+- **Key Learning**: Large open-source models (70B+) can take 30-60 seconds per response. Always set generous timeouts.
+
+### 9.7 GPU vs CPU Embedding — "cannot copy out of meta tensor"
+
+- **Symptom**: `cannot copy out of meta tensor` error when registering Confluence page
+- **Root Cause**: PyTorch attempting GPU operations on CPU-only machine, or concurrent embedding requests causing memory pressure
+- **Context**: Confluence sync was still running (embedding pages) when user tried URL registration simultaneously
+- **Fix**: Wait for sync to complete before additional embedding operations
+- **Improvement needed**: Queue-based embedding to prevent concurrent model access
+
+---
+
+## 10. Production Deployment Architecture (2026-03-25)
+
+### 10.1 Unified Server — No Node.js Required
+
+- **Before**: Backend (Python :8080) + Frontend (Vite/Node :3000) = 2 processes, 2 ports
+- **After**: `npm run build` → `platform/dist/` → FastAPI serves static files
+  ```
+  http://localhost:8080/         → React SPA (index.html)
+  http://localhost:8080/api/*    → FastAPI backend
+  http://localhost:8080/assets/* → CSS/JS static files
+  ```
+- **Result**: Single process, single port, Python only
+- **User experience**: `start.bat` double-click → browser opens → done
+- **File**: `app/main.py` — SPA catch-all route serves index.html for all non-API paths
+
+### 10.2 Deployment Options Comparison
+
+| Method | Requirements | Best For |
+|--------|-------------|----------|
+| **Local PC** | Python only | Individual use, demo |
+| **Linux server** | Python + nginx | Team (10-100 users) |
+| **Docker** | Docker only | Easy deployment |
+| **Air-gapped** | Python + offline packages | Closed networks |
+
+---
+
+*Last updated: 2026-03-25*
 *Author: Jason (JasonAIFactory)*
