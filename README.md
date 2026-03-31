@@ -14,6 +14,26 @@
 
 ---
 
+## Why I Built This
+
+Manufacturing companies in Korea operate in air-gapped networks where ChatGPT and cloud AI services are blocked. Factory floor engineers need data insights but can't write SQL. Internal documents are scattered across Confluence, shared drives, and Git repos. I built this platform to solve these real problems from my 5 years of MES/WMS experience.
+
+---
+
+## Demo
+
+> **Try it:** Clone → `pip install` → `start.bat` → Ask "What is the defect rate for Line A this month?" and watch it generate SQL, query Oracle, and respond in natural language.
+
+| Query | Result |
+|-------|--------|
+| "A라인 이번달 불량률 알려줘" | Generates SQL → queries Oracle → "A라인(SMT) defect rate: 2.47%" |
+| "납땜불량 급증 원인 분석해줘" | Multi-agent: Quality Analyst queries DB + Doc Searcher finds SOP → combined report |
+| "현재 재고가 가장 많은 품목 5개" | Text-to-SQL → Inventory table → top 5 items with quantities |
+
+[Screenshots placeholder - 6 images in 2x3 grid]
+
+---
+
 ## Key Features
 
 | # | Feature | Description |
@@ -59,6 +79,33 @@
     │  + BM25      │  │       │  │ or vLLM (airgap) │
     └──────────────┘  └───────┘  └──────────────────┘
 ```
+
+---
+
+## Technical Decisions
+
+| Decision | Why | Alternative Considered |
+|----------|-----|----------------------|
+| ChromaDB over Pinecone | Air-gapped: no external API calls. Embedded mode = no separate server | Pinecone (cloud-only), Milvus (complex setup) |
+| BGE-M3 embedding | Multilingual (KR+EN), supports Dense+Sparse+ColBERT in one model | OpenAI embeddings (cloud-only), e5-large (English-only) |
+| FastAPI over Django | Async-native, lightweight, auto OpenAPI docs | Django (heavy ORM not needed), Flask (no async) |
+| Multi-agent over single RAG | Scoped search per agent → higher accuracy than searching all docs | Single RAG pipeline (noisy with 1000+ docs) |
+| SQLAlchemy + raw oracledb | Thin mode (no Oracle Client install), works in air-gapped | cx_Oracle (requires Oracle Client binary) |
+| Pre-built frontend (dist/) | Users only need Python, no Node.js install | Vite dev server (requires Node.js on every PC) |
+
+---
+
+## Performance
+
+| Metric | Value |
+|--------|-------|
+| Chat response (pure LLM) | ~2 seconds |
+| Text-to-SQL generation | ~1.8 seconds |
+| SQL execution (Oracle) | ~0.08 seconds |
+| RAG search (hybrid) | ~0.5 seconds |
+| Multi-agent orchestration (2 agents) | ~22 seconds |
+| Embedding model load (cold start) | ~10 seconds |
+| Frontend build size | ~650KB gzipped |
 
 ---
 
