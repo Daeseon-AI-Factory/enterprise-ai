@@ -10,10 +10,46 @@ from app.core.document_loader import DocumentLoader
 from app.core.prompts import SYSTEM_RAG
 
 
+QUERY_EXPANSION_PROMPT = """Generate 3 alternative search queries for the given question.
+Each query should use different keywords, synonyms, or rephrasings to improve document retrieval.
+Include both Korean and English variations if applicable.
+
+Return ONLY the queries, one per line. No numbering, no explanation.
+
+Question: {query}"""
+
+
 class RagService:
     def __init__(self):
         self._vector_store = get_vector_store()
         self._doc_loader = DocumentLoader()
+
+    async def _expand_query(self, query: str) -> list[str]:
+        """Generate alternative queries via LLM for better recall.
+
+        Why: A single query misses relevant documents that use different terminology.
+        e.g., "불량률" should also find "품질", "수율", "defect rate".
+
+        Returns the original query + up to 3 expanded queries.
+        """
+        expanded = [query]  # always include original
+        try:
+            response = chat_completion(
+                messages=[
+                    {"role": "user", "content": QUERY_EXPANSION_PROMPT.format(query=query)},
+                ],
+                temperature=0.7,
+                max_tokens=200,
+            )
+            lines = response.choices[0].message.content.strip().split("\n")
+            for line in lines:
+                line = line.strip().lstrip("0123456789.-) ")
+                if line and line != query:
+                    expanded.append(line)
+            logger.info(f"[RAG] Query expansion: '{query[:50]}' → {len(expanded)} queries")
+        except Exception as e:
+            logger.warning(f"[RAG] Query expansion failed, using original only: {e}")
+        return expanded[:4]  # cap at original + 3
 
     async def upload_and_index(
         self,
@@ -69,13 +105,32 @@ class RagService:
             "doc_id": doc_id,
         }
 
+    def _deduplicate_results(self, results: list[dict], top_k: int) -> list[dict]:
+        """Remove duplicate chunks across multi-query results, keeping highest score."""
+        seen: dict[str, dict] = {}
+        for r in results:
+            key = r.get("id", r.get("content", "")[:100])
+            existing = seen.get(key)
+            if existing is None or r.get("rerank_score", 0) > existing.get("rerank_score", 0):
+                seen[key] = r
+        deduped = sorted(seen.values(), key=lambda x: x.get("rerank_score", x.get("score", 0)), reverse=True)
+        return deduped[:top_k]
+
     async def query(
         self,
         query: str,
         collection: str = "all",
         top_k: int = 5,
     ) -> dict:
-        """Query documents using RAG pipeline. collection='all' searches every collection."""
+        """Query documents using RAG pipeline with query expansion.
+
+        Pipeline:
+          1. Expand query into multiple variations (LLM-based)
+          2. Run hybrid search (dense + BM25 + RRF + rerank) for each variation
+          3. Deduplicate and merge results
+          4. Filter by confidence threshold
+          5. Generate answer with LLM
+        """
         import time
         t0 = time.time()
         logger.info(f"[RAG] 질의 시작: '{query[:80]}' (컬렉션: {collection}, top_k: {top_k})")
@@ -85,34 +140,44 @@ class RagService:
                 "answer": "임베딩 모델이 설치되지 않았습니다. models/embedding/ 폴더에 모델을 복사해주세요.",
                 "sources": [],
             }
-        # Search all collections or a specific one (hybrid: dense + BM25 + rerank)
-        if collection in ("all", "", "*"):
-            all_results = []
-            for col in self._vector_store.list_collections():
-                col_name = col["name"]
+
+        # Step 1: Expand query for better recall
+        queries = await self._expand_query(query)
+
+        # Step 2: Search with all query variations
+        all_results = []
+        collections_to_search = (
+            [col["name"] for col in self._vector_store.list_collections()]
+            if collection in ("all", "", "*")
+            else [collection]
+        )
+
+        for q in queries:
+            for col_name in collections_to_search:
                 try:
                     hits = self._vector_store.hybrid_search(
-                        collection=col_name, query=query, top_k=top_k
+                        collection=col_name, query=q, top_k=top_k
                     )
                     for h in hits:
                         h["collection"] = col_name
                     all_results.extend(hits)
                 except Exception as e:
                     logger.warning(f"Hybrid search failed in '{col_name}': {e}")
-            # Final cross-collection rerank by rerank_score
-            all_results.sort(key=lambda x: x.get("rerank_score", x.get("score", 0)), reverse=True)
-            results = all_results[:top_k]
-            logger.info(
-                f"RAG hybrid (all collections): '{query[:50]}' → {len(results)} chunks "
-                f"from {list(set(r.get('collection','') for r in results))}"
-            )
-        else:
-            results = self._vector_store.hybrid_search(
-                collection=collection, query=query, top_k=top_k
-            )
-            for r in results:
-                r["collection"] = collection
-            logger.info(f"RAG hybrid ('{collection}'): '{query[:50]}' → {len(results)} chunks")
+
+        # Step 3: Deduplicate across all query variations
+        results = self._deduplicate_results(all_results, top_k)
+
+        # Step 4: Confidence filter — drop low-quality chunks
+        MIN_RERANK_SCORE = 0.3
+        before_filter = len(results)
+        results = [r for r in results if r.get("rerank_score", r.get("score", 0)) >= MIN_RERANK_SCORE]
+        if before_filter > len(results):
+            logger.info(f"[RAG] Confidence filter: {before_filter} → {len(results)} chunks (threshold={MIN_RERANK_SCORE})")
+
+        logger.info(
+            f"[RAG] 검색 완료: {len(queries)} queries × {len(collections_to_search)} collections "
+            f"→ {len(results)} chunks from {list(set(r.get('collection','') for r in results))}"
+        )
 
         # Build context from retrieved docs
         context_parts = []

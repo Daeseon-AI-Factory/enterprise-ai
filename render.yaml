@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: enterprise-llm
+    runtime: docker
+    plan: starter  # 2GB RAM for embedding model
+    envVars:
+      - key: LLM_API_BASE
+        value: https://api.groq.com/openai/v1
+      - key: LLM_API_KEY
+        sync: false  # set manually in Render dashboard
+      - key: LLM_MODEL
+        value: llama-3.1-8b-instant
+      - key: MODE
+        value: local
+      - key: DB_TYPE
+        value: sqlite
+      - key: DB_NAME
+        value: ./data/demo.db
+      - key: CHROMA_PORT
+        value: "0"
+      - key: EMBEDDING_MODEL_PATH
+        value: ./models/embedding
+      - key: FUNCTION_CALLING_MODE
+        value: prompt

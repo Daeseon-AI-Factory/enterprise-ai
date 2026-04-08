@@ -21,12 +21,14 @@ def _build_db_url(
     user: str | None = None,
     password: str | None = None,
 ) -> str | None:
+    from urllib.parse import quote_plus
+
     t = db_type or settings.DB_TYPE
     h = host or settings.DB_HOST
     p = port or settings.DB_PORT
     n = name or settings.DB_NAME
-    u = user or settings.DB_USER
-    pw = password or settings.DB_PASSWORD
+    u = quote_plus(user or settings.DB_USER or "")
+    pw = quote_plus(password or settings.DB_PASSWORD or "")
 
     if not u:
         return None
@@ -286,10 +288,50 @@ class Text2SqlService:
         return sql, explanation
 
     def _is_safe_sql(self, sql: str) -> bool:
-        if not sql:
+        """Validate SQL safety using AST parsing, not regex.
+
+        Why AST over regex: regex-based checks are trivially bypassed with
+        comments (-- \\nDELETE), whitespace, or CTEs. sqlparse tokenizes
+        the SQL into an AST and identifies the actual statement type,
+        regardless of formatting tricks.
+
+        Only SELECT and WITH (CTE followed by SELECT) are allowed.
+        """
+        if not sql or not sql.strip():
             return False
-        normalized = sql.strip().upper()
-        for kw in ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "EXEC"]:
-            if normalized.startswith(kw):
-                return False
+
+        import sqlparse
+
+        # Parse all statements (handles "SELECT 1; DROP TABLE x" injection)
+        statements = sqlparse.parse(sql)
+        if not statements:
+            return False
+
+        # Reject multi-statement SQL — only one statement allowed
+        # (filters out "SELECT 1; DROP TABLE users" attacks)
+        real_statements = [s for s in statements if s.get_type() is not None]
+        if len(real_statements) > 1:
+            logger.warning(f"[SQL] Multi-statement SQL blocked: {len(real_statements)} statements")
+            return False
+
+        for stmt in statements:
+            stmt_type = stmt.get_type()
+            # Allow SELECT and UNKNOWN (WITH/CTE parses as UNKNOWN in sqlparse)
+            if stmt_type == "SELECT":
+                continue
+            if stmt_type == "UNKNOWN":
+                # WITH (CTE) + SELECT is valid — verify no DML keywords in tokens
+                flat = sql.strip().upper()
+                # Strip comments to prevent hiding DML inside them
+                stripped = sqlparse.format(sql, strip_comments=True).strip().upper()
+                for dangerous in ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER",
+                                  "CREATE", "TRUNCATE", "EXEC", "MERGE", "GRANT", "REVOKE"]:
+                    if dangerous in stripped.split():
+                        logger.warning(f"[SQL] Dangerous keyword '{dangerous}' in statement")
+                        return False
+                continue
+            # Any other statement type (DML, DDL) → block
+            logger.warning(f"[SQL] Blocked statement type: {stmt_type}")
+            return False
+
         return True
